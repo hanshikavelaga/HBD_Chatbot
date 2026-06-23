@@ -49,16 +49,6 @@
         "unanswered"
       ],
       "answer": ""
-    },
-    {
-      "id": "missed_question",
-      "patterns": [
-        "\"What is your app?\""
-      ],
-      "tags": [
-        "unanswered"
-      ],
-      "answer": ""
     }
   ]
 }
