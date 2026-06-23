@@ -2,8 +2,10 @@ import csv
 import sqlite3
 import os
 
-CSV_PATH = 'backend/g_map_master_table_sample.csv'
-DB_PATH = 'backend/google_map_data.db'
+BASE_DIR = os.path.dirname(__file__)
+
+CSV_PATH = os.path.join(BASE_DIR, "g_map_master_table_sample.csv")
+DB_PATH = os.path.join(BASE_DIR, "google_map_data.db")
 
 def migrate():
     print(f"📦 Starting migration from {CSV_PATH} to {DB_PATH}")

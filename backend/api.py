@@ -541,15 +541,20 @@ def search(req: SearchRequest):
                 from text_to_sql import generate_sql
                 sql = generate_sql(req.query)
                 if sql not in ["UNSAFE_QUERY", ""]:
-                    conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+                    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+                    DB_PATH = os.path.join(BASE_DIR, "google_map_data.db")
+                    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
                     cur = conn.cursor()
                     cur.execute(sql)
                     rows = cur.fetchall()
+                    print("SQL:", sql)
+                    print("RowsFound:",len(rows))
                     cols = [c[0] for c in cur.description] if cur.description else []
                     conn.close()
                     if rows: return {"type": "database", "data": map_business_fields([dict(zip(cols, r)) for r in rows]), "intro": lang_fetch("found_results", lang)}
-            except: pass
-            
+            except Exception as e:
+                print("SQL ERROR:",e)
+    
             # --- ONLY DO ONLINE SEARCH for BUSINESSES if absolutely necessary ---
             if intent == "SEARCH_BUSINESS":
                 try:

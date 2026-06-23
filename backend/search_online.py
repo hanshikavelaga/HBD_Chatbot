@@ -3,6 +3,9 @@
 import json
 import pandas as pd
 from typing import List, Dict
+from datetime import datetime 
+import os
+import sqlite3
 
 from llm_client import call_llm
 from models import MODEL
@@ -51,7 +54,209 @@ def _normalize_results(raw: List[Dict]) -> List[Dict]:
 
     return normalized
 
+def validate_business(record):
+    if not record.get("name", "").strip():
+        return False
 
+    if not record.get("address", "").strip():
+        return False
+
+    if not record.get("city", "").strip():
+        return False
+
+    if not record.get("category", "").strip():
+        return False
+
+    if record.get("reviews_average", 0) < 0 or record.get("reviews_average", 0) > 5:
+        return False
+
+    if record.get("reviews_count", 0) < 0:
+        return False
+
+    return True
+
+def find_existing_business(cursor, name, city):
+    cursor.execute(
+        """
+        SELECT id
+        FROM google_maps_listings
+        WHERE LOWER(name) = ?
+        AND LOWER(city) = ?
+        LIMIT 1
+        """,
+        (name.strip().lower(), city.strip().lower())
+    )
+
+    row = cursor.fetchone()
+
+    if row:
+        return row[0]  # business id
+
+    return None
+
+def update_existing_business(cursor, business_id, record):
+    # Get existing data
+    cursor.execute(
+        """
+        SELECT website, phone_number, reviews_count, reviews_average,
+               city, state, area, subcategory
+        FROM google_maps_listings
+        WHERE id = ?
+        """,
+        (business_id,)
+    )
+
+    existing = cursor.fetchone()
+
+    if not existing:
+        return
+
+    (
+        db_website,
+        db_phone,
+        db_reviews_count,
+        db_reviews_average,
+        db_city,
+        db_state,
+        db_area,
+        db_subcategory
+    ) = existing
+
+    # Fill missing values only
+    website = db_website or record.get("website", "")
+    phone_number = db_phone or record.get("phone_number", "")
+    city = db_city or record.get("city", "")
+    state = db_state or record.get("state", "")
+    area = db_area or record.get("area", "")
+    subcategory = db_subcategory or record.get("subcategory", "")
+
+    # Update reviews only if newer count is higher
+    reviews_count = db_reviews_count
+    reviews_average = db_reviews_average
+
+    if record.get("reviews_count", 0) > (db_reviews_count or 0):
+        reviews_count = record.get("reviews_count", 0)
+        reviews_average = record.get("reviews_average", 0)
+
+    cursor.execute(
+        """
+        UPDATE google_maps_listings
+        SET website = ?,
+            phone_number = ?,
+            reviews_count = ?,
+            reviews_average = ?,
+            city = ?,
+            state = ?,
+            area = ?,
+            subcategory = ?
+        WHERE id = ?
+        """,
+        (
+            website,
+            phone_number,
+            reviews_count,
+            reviews_average,
+            city,
+            state,
+            area,
+            subcategory,
+            business_id
+        )
+    )
+
+def insert_new_business(cursor, record):
+    cursor.execute(
+        """
+        INSERT INTO google_maps_listings (
+            name,
+            address,
+            website,
+            phone_number,
+            reviews_count,
+            reviews_average,
+            category,
+            subcategory,
+            city,
+            state,
+            area,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            record.get("name", ""),
+            record.get("address", ""),
+            record.get("website", ""),
+            record.get("phone_number", ""),
+            record.get("reviews_count", 0),
+            record.get("reviews_average", 0.0),
+            record.get("category", ""),
+            record.get("subcategory", ""),
+            record.get("city", ""),
+            record.get("state", ""),
+            record.get("area", ""),
+            datetime.now().isoformat()
+        )
+    )
+
+DB = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "google_map_data.db"
+)
+
+def save_results_to_sqlite(results):
+    conn = sqlite3.connect(DB)
+    cursor = conn.cursor()
+
+    inserted = 0
+    updated = 0
+    skipped = 0
+
+    try:
+        for record in results:
+
+            # Validation
+            if not validate_business(record):
+                skipped += 1
+                continue
+
+            # Duplicate check
+            business_id = find_existing_business(
+                cursor,
+                record.get("name", ""),
+                record.get("city", "")
+            )
+
+            if business_id:
+                update_existing_business(
+                    cursor,
+                    business_id,
+                    record
+                )
+                updated += 1
+            else:
+                insert_new_business(
+                    cursor,
+                    record
+                )
+                inserted += 1
+
+        conn.commit()
+
+        print(
+            f"SQLite Sync Complete | "
+            f"Inserted={inserted}, "
+            f"Updated={updated}, "
+            f"Skipped={skipped}"
+        )
+
+    except Exception as e:
+        conn.rollback()
+        print(f"SQLite Sync Error: {e}")
+        raise
+
+    finally:
+        conn.close()
 def search_online_and_save(query: str) -> List[Dict]:
     if not query or not query.strip():
         raise ValueError("Search query cannot be empty")
@@ -97,6 +302,7 @@ Rules:
         return []
 
     results = _normalize_results(raw_results)
+    save_results_to_sqlite(results)
 
     # ----- Save to Excel -----
     df = pd.DataFrame(results)
