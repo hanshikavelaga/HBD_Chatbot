@@ -409,7 +409,7 @@ def search(req: SearchRequest):
                 
                 # --- CASE 1: MANAGE PRODUCTS (Highest Priority) ---
                 if "manage product" in q_lower or "show product" in q_lower:
-                    conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+                    conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
                     cur = conn.cursor()
                     cur.execute("SELECT * FROM products WHERE business_id = ?", (biz_row.get("id"),))
                     rows = cur.fetchall()
@@ -427,7 +427,7 @@ def search(req: SearchRequest):
 
                 # --- CASE 2: MANAGE DEALS ---
                 elif "manage deal" in q_lower or "show deal" in q_lower:
-                    conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+                    conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
                     cur = conn.cursor()
                     cur.execute("SELECT * FROM deals WHERE business_id = ?", (biz_row.get("id"),))
                     rows = cur.fetchall()
@@ -551,7 +551,7 @@ def search(req: SearchRequest):
                 if sql not in ["UNSAFE_QUERY", ""]:
                     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
                     DB_PATH = os.path.join(BASE_DIR, "google_map_data.db")
-                    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+                    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10.0)
                     cur = conn.cursor()
                     cur.execute(sql)
                     rows = cur.fetchall()
@@ -591,7 +591,7 @@ def add_biz(req: BusinessAddRequest):
     try:
         from datetime import datetime
         print(f"DEBUG: add_biz request: {req.dict()}")
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         created_at = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         email_val = (req.email or "").strip().lower()
@@ -632,7 +632,7 @@ def add_product(req: AddProductRequest):
         print(f"DEBUG add_product: business_id={req.business_id}, name={req.name}, price={req.price}, category={req.category}")
         if not req.business_id:
             raise HTTPException(400, "business_id is required. Please login first.")
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         created_at = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         cur.execute("""
@@ -653,7 +653,7 @@ def add_product(req: AddProductRequest):
 def add_deal(req: AddDealRequest):
     try:
         from datetime import datetime
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         created_at = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         cur.execute("""
@@ -668,7 +668,7 @@ def add_deal(req: AddDealRequest):
 @app.get("/api/business/{biz_id}/products")
 def get_products(biz_id: int):
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         cur.execute("SELECT * FROM products WHERE business_id = ?", (biz_id,))
         rows = cur.fetchall()
@@ -680,7 +680,7 @@ def get_products(biz_id: int):
 @app.get("/api/business/{biz_id}/deals")
 def get_deals(biz_id: int):
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         cur.execute("SELECT * FROM deals WHERE business_id = ?", (biz_id,))
         rows = cur.fetchall()
@@ -692,7 +692,7 @@ def get_deals(biz_id: int):
 @app.delete("/api/products/{product_id}")
 def delete_product(product_id: int):
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         cur.execute("DELETE FROM products WHERE id = ?", (product_id,))
         conn.commit()
@@ -703,7 +703,7 @@ def delete_product(product_id: int):
 @app.delete("/api/deals/{deal_id}")
 def delete_deal(deal_id: int):
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         cur.execute("DELETE FROM deals WHERE id = ?", (deal_id,))
         conn.commit()
@@ -714,7 +714,7 @@ def delete_deal(deal_id: int):
 @app.get("/api/business/search-name")
 def search_by_name(name: str):
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute(f"SELECT * FROM {BIZ_TABLE} WHERE business_name LIKE ? LIMIT 10", (f"%{name}%",))
@@ -728,7 +728,7 @@ def search_by_name(name: str):
 @app.get("/api/business/search-address")
 def search_by_address(address: str):
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute(
@@ -745,7 +745,7 @@ def search_by_address(address: str):
 @app.get("/api/categories")
 def get_categories():
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         cur.execute(f"SELECT business_category as name, COUNT(*) as count FROM {BIZ_TABLE} WHERE business_category IS NOT NULL AND business_category != '' GROUP BY business_category ORDER BY count DESC LIMIT 12")
         rows = cur.fetchall()
@@ -758,7 +758,7 @@ def get_categories():
 @app.get("/api/trending")
 def get_trending():
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute(f"SELECT * FROM {BIZ_TABLE} WHERE ratings > 0 ORDER BY ratings DESC, reviews_count DESC LIMIT 8")
@@ -773,7 +773,7 @@ def get_trending():
 def get_analytics():
     """Power BI-style analytics data from real database"""
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
 
@@ -930,7 +930,7 @@ def health(): return {"status": "ok", "database": "connected", "businesses": 507
 
 def get_chat_db():
     """Returns a connection to google_map_data.db with row factory enabled."""
-    conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+    conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -1021,7 +1021,7 @@ def _save_chat_message(session_id: str, role: str, content: str):
     """Helper: Save a single message to chat_messages and update session updated_at."""
     try:
         now = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO chat_messages (session_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
@@ -1039,7 +1039,7 @@ def _save_chat_message(session_id: str, role: str, content: str):
 def _get_recent_history(session_id: str, limit: int = 10):
     """Helper: Fetch the last N messages for a session to use as LLM context."""
     try:
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
         cur.execute(
@@ -1058,7 +1058,7 @@ def _update_session_title(session_id: str, first_message: str):
     """Set the session title from the first user message (truncated to 60 chars)."""
     try:
         title = first_message.strip()[:60]
-        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False)
+        conn = sqlite3.connect(DATABASE_URL, check_same_thread=False, timeout=10.0)
         cur = conn.cursor()
         # Only update if still default title
         cur.execute(
