@@ -201,7 +201,7 @@ def insert_new_business(cursor, record):
 
 DB = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "google_map_data.db"
+    "g_map_master_table.db"
 )
 
 def save_results_to_sqlite(results):
