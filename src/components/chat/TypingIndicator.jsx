@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function TypingIndicator() {
+export default function TypingIndicator({ status }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
       <div style={{
@@ -23,22 +23,36 @@ export default function TypingIndicator() {
           🐝
         </div>
 
-        {/* Dots */}
-        <div style={{
-          background: 'var(--chat-bot-bg)',
-          border: '1px solid var(--chat-bot-border)',
-          borderRadius: '4px 18px 18px 18px',
-          padding: '10px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          boxShadow: 'var(--shadow-sm)',
-        }}>
-          <div className="typing-dot" />
-          <div className="typing-dot" />
-          <div className="typing-dot" />
+        {/* Dots + Status text container */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{
+            background: 'var(--chat-bot-bg)',
+            border: '1px solid var(--chat-bot-border)',
+            borderRadius: '4px 18px 18px 18px',
+            padding: '10px 14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            boxShadow: 'var(--shadow-sm)',
+          }}>
+            <div className="typing-dot" />
+            <div className="typing-dot" />
+            <div className="typing-dot" />
+          </div>
+          {status && (
+            <span style={{
+              fontSize: '0.6875rem',
+              color: 'var(--text-muted)',
+              paddingLeft: 4,
+              animation: 'pulse 1.5s infinite',
+              fontWeight: 500
+            }}>
+              {status}
+            </span>
+          )}
         </div>
       </div>
     </div>
   );
 }
+

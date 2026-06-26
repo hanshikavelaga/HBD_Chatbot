@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Grid, Search, ChevronRight, Tag, RefreshCw, ArrowRight } from 'lucide-react';
+import { 
+  Grid, Search, ChevronRight, Tag, RefreshCw, ArrowRight,
+  Dumbbell, Utensils, Sparkles, HeartPulse, GraduationCap, 
+  ShoppingBag, Car, Briefcase
+} from 'lucide-react';
 import { api } from '../services/api';
 import { CategoryCardSkeleton } from '../components/ui/Skeleton';
 
@@ -14,17 +18,38 @@ const ACENT_COLORS = [
   '#a35265', // Sakura Gold/Red
 ];
 
-export default function CategoriesPage({ toast }) {
+const ICON_COMPONENTS = {
+  Dumbbell: Dumbbell,
+  Utensils: Utensils,
+  Sparkles: Sparkles,
+  HeartPulse: HeartPulse,
+  GraduationCap: GraduationCap,
+  ShoppingBag: ShoppingBag,
+  Car: Car,
+  Briefcase: Briefcase,
+  Tag: Tag
+};
+
+export default function CategoriesPage({ toast, session }) {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState([]);
+  const [parentCategories, setParentCategories] = useState([]);
+  const [activeParentId, setActiveParentId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchCategories = () => {
     setLoading(true);
-    api.getCategories()
+    api.getCategories(true)
       .then(data => {
-        setCategories(Array.isArray(data) ? data : []);
+        const parents = Array.isArray(data) ? data : [];
+        setParentCategories(parents);
+        if (parents.length > 0) {
+          // Keep active parent selection if valid, else select first
+          const exists = parents.some(p => p.id === activeParentId);
+          if (!exists) {
+            setActiveParentId(parents[0].id);
+          }
+        }
       })
       .catch(() => toast?.error('Failed to load categories'))
       .finally(() => setLoading(false));
@@ -34,14 +59,45 @@ export default function CategoriesPage({ toast }) {
     fetchCategories();
   }, []);
 
-  const filteredCategories = categories.filter(cat => {
-    const name = cat.name || cat.category || '';
-    return name.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const getFilteredSubcategories = () => {
+    if (searchTerm.trim() !== '') {
+      let results = [];
+      parentCategories.forEach(parent => {
+        if (parent.subcategories) {
+          parent.subcategories.forEach(sub => {
+            if (sub.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+              results.push({
+                ...sub,
+                parentName: parent.name,
+                parentIcon: parent.icon
+              });
+            }
+          });
+        }
+      });
+      return results;
+    } else {
+      const activeParent = parentCategories.find(p => p.id === activeParentId);
+      return activeParent?.subcategories || [];
+    }
+  };
 
   const handleCategoryClick = (name) => {
-    navigate(`/chat?q=${encodeURIComponent(`find ${name} near me`)}`);
+    let city = session?.city || localStorage.getItem('userCity');
+    if (!city) {
+      city = window.prompt("Please enter your city to find businesses near you:", "Surat");
+      if (city) {
+        localStorage.setItem('userCity', city);
+      }
+    }
+    if (city) {
+      navigate(`/chat?q=${encodeURIComponent(`${name} in ${city}`)}`);
+    } else {
+      navigate(`/chat?q=${encodeURIComponent(`find ${name} near me`)}`);
+    }
   };
+
+  const filteredSubs = getFilteredSubcategories();
 
   return (
     <div 
@@ -53,7 +109,7 @@ export default function CategoriesPage({ toast }) {
       }} 
       className="no-scrollbar"
     >
-      {/* ─── JAPANESE MINIMALIST HEADER ─────────────────────────── */}
+      {/* ─── HEADER ─────────────────────────── */}
       <div style={{
         borderBottom: '1px solid var(--border-subtle)',
         paddingBottom: 24,
@@ -134,7 +190,7 @@ export default function CategoriesPage({ toast }) {
         <Search size={16} style={{ color: 'var(--text-muted)' }} />
         <input 
           type="text"
-          placeholder="Filter categories..."
+          placeholder="Search categories..."
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
           style={{
@@ -162,6 +218,58 @@ export default function CategoriesPage({ toast }) {
         )}
       </div>
 
+      {/* ─── PARENT CATEGORY TABS (Hidden when searching) ────────────────── */}
+      {!searchTerm && !loading && parentCategories.length > 0 && (
+        <div style={{
+          display: 'flex',
+          gap: 10,
+          overflowX: 'auto',
+          paddingBottom: 16,
+          marginBottom: 24,
+          borderBottom: '1px solid var(--border-subtle)'
+        }} className="no-scrollbar">
+          {parentCategories.map((parent) => {
+            const ParentIcon = ICON_COMPONENTS[parent.icon] || Tag;
+            const isSelected = activeParentId === parent.id;
+            return (
+              <button
+                key={parent.id}
+                onClick={() => setActiveParentId(parent.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 16px',
+                  borderRadius: 20,
+                  border: isSelected ? '1px solid var(--color-primary)' : '1px solid var(--border-subtle)',
+                  background: isSelected ? 'var(--color-primary-light)' : 'var(--bg-surface)',
+                  color: isSelected ? 'var(--color-primary)' : 'var(--text-secondary)',
+                  fontWeight: 700,
+                  fontSize: '0.8125rem',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 200ms ease'
+                }}
+              >
+                <ParentIcon size={14} />
+                <span>{parent.name}</span>
+                <span style={{
+                  fontSize: '0.6875rem',
+                  opacity: 0.8,
+                  background: isSelected ? 'var(--color-primary)' : 'var(--bg-surface-2)',
+                  color: isSelected ? '#fff' : 'var(--text-muted)',
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  marginLeft: 4
+                }}>
+                  {parent.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ─── MAIN GRID ─────────────────────────────────────────── */}
       {loading ? (
         <div style={{
@@ -171,20 +279,21 @@ export default function CategoriesPage({ toast }) {
         }}>
           {[...Array(12)].map((_, i) => <CategoryCardSkeleton key={i} />)}
         </div>
-      ) : filteredCategories.length > 0 ? (
+      ) : filteredSubs.length > 0 ? (
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
           gap: 16
         }}>
-          {filteredCategories.map((cat, i) => {
-            const name = cat.name || cat.category || 'Unknown';
-            const count = cat.count ?? cat.total ?? 0;
+          {filteredSubs.map((sub, i) => {
+            const name = sub.name || 'Unknown';
+            const count = sub.count ?? 0;
             const accentColor = ACENT_COLORS[i % ACENT_COLORS.length];
+            const SubIcon = ICON_COMPONENTS[sub.icon] || Tag;
 
             return (
               <div
-                key={i}
+                key={sub.id || i}
                 onClick={() => handleCategoryClick(name)}
                 style={{
                   background: 'var(--bg-surface)',
@@ -233,7 +342,7 @@ export default function CategoriesPage({ toast }) {
                     justifyContent: 'center',
                     color: accentColor
                   }}>
-                    <Tag size={14} />
+                    <SubIcon size={14} />
                   </div>
                   
                   <span style={{
@@ -249,18 +358,25 @@ export default function CategoriesPage({ toast }) {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-                  <h3 style={{
-                    fontSize: '0.875rem',
-                    fontWeight: 700,
-                    color: 'var(--text-primary)',
-                    margin: 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: '85%'
-                  }}>
-                    {name}
-                  </h3>
+                  <div>
+                    <h3 style={{
+                      fontSize: '0.875rem',
+                      fontWeight: 700,
+                      color: 'var(--text-primary)',
+                      margin: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 180
+                    }}>
+                      {name}
+                    </h3>
+                    {searchTerm && (
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                        in {sub.parentName}
+                      </span>
+                    )}
+                  </div>
                   <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
                 </div>
               </div>

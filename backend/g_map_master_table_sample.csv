@@ -506,3 +506,21 @@ id,name,address,website,phone_number,reviews_count,reviews_avg,category,subcateg
 505,sir tution,near mp school,,7865432774,0,0.0,education,,surat,gujarat,mota varachha,2026-04-10T16:59:43,danti1301@gmail.com
 506,RK gold brothers,near indira chock,,9998887666,0,0.0,jeweleery,,rajkot,Gujarat,indira chock,2026-04-11T15:29:05,darshitkachhadiya19@gmail.com
 507,dd jewellers,near indira circle,,8777777777,0,0.0,jeewellers,,rajkot,Gujarat,indira circle,2026-04-14T12:00:47,darshitkachhadiya19@gmail.com
+531,Sharma Bakery & Sweets,"Shop 12, Prime Arcade, Anand Mahal Road, Adajan",https://www.sharmabakerysurat.com,+91 98250 12345,245,4.6,Bakery,"Cake Shop, Desserts, Indian Sweets",Surat,Gujarat,Adajan,2026-06-25T12:58:15,info@sharmabakerysurat.com
+532,Krishna Dental Care & Implant Centre,"201, Landmark Building, Link Road, Andheri West",https://www.krishnadentalcare.in,+91 22 2673 9876,188,4.8,Clinic,"Dentist, Orthodontist, Dental Surgery",Mumbai,Maharashtra,Andheri West,2026-06-25T12:58:15,appointments@krishnadentalcare.in
+533,Royal Palms Luxury Hotel & Suites,"88, Koregaon Park Road, Lane 5",https://www.royalpalmshotelpune.com,+91 20 6612 3400,512,4.7,Hotel,"Luxury Stay, Fine Dining, Conference Hall",Pune,Maharashtra,Koregaon Park,2026-06-25T12:58:15,reservations@royalpalmshotelpune.com
+534,FitLife Unisex Gym & Fitness Centre,"4th Floor, Sector 5, HSR Layout",https://www.fitlifegymbengaluru.com,+91 80 4956 7890,320,4.5,Gym,"Fitness Trainer, Yoga Class, Cardio, Weightlifting",Bengaluru,Karnataka,HSR Layout,2026-06-25T12:58:15,support@fitlifegymbengaluru.com
+535,Apollo Pharmacy Adajan,"Ground Floor, Sunrise Tower, Adajan",https://www.apollopharmacy.in,+91 98790 54321,98,4.4,Pharmacy,"Medicines, Healthcare Products, Baby Care",Surat,Gujarat,Adajan,2026-06-25T12:58:15,adajan@apollopharmacy.in
+536,TechVeda IT Solutions & Consultancy,"Phase II, Hitech City, Madhapur",https://www.techvedasolutions.com,+91 40 4823 4567,75,4.6,IT Services,"Software Development, Web Design, Mobile Apps",Hyderabad,Telangana,Madhapur,2026-06-25T12:58:15,contact@techvedasolutions.com
+537,Gourmet Garden Organic Cafe,"Shop 4, Palladium Mall, Bodakdev",https://www.gourmetgardencafe.com,+91 79 4001 2345,142,4.5,Cafe,"Vegetarian Bistro, Specialty Coffee, Organic Food",Ahmedabad,Gujarat,Bodakdev,2026-06-25T12:58:15,hello@gourmetgardencafe.com
+538,StyleCraft Hair & Beauty Unisex Salon,"1st Floor, Galaxy Plaza, VIP Road, Vesu",https://www.stylecraftsalon.com,+91 99090 98765,210,4.7,Salon,"Haircut, Bridal Makeup, Facial, Hair Spa",Surat,Gujarat,Vesu,2026-06-25T12:58:15,appointments@stylecraftsalon.com
+539,SmartMart Supermarket & Grocery,"Ground Floor, Milestone Building, Alkapuri",https://www.smartmartsupermarket.com,+91 265 233 4455,315,4.3,Grocery,"Supermarket, Fresh Vegetables, Daily Needs",Vadodara,Gujarat,Alkapuri,2026-06-25T12:58:15,alkapuri@smartmartsupermarket.com
+540,Speedy Wheels Car Service & Repair,"Plot 45, MIDC Industrial Area, Satpur",https://www.speedywheelscarcare.com,+91 253 235 6677,110,4.5,Automobile,"Car Wash, Wheel Alignment, Engine Repair",Nashik,Maharashtra,Satpur,2026-06-25T12:58:15,satpur@speedywheelscarcare.com
+<<<<<<< HEAD
+574,Merchant Test Cafe,123 Main St,,1234567890,0,0.0,Cafe,,pune,,,2026-06-26T16:04:19,testmerchant_9705@example.com
+575,Merchant Test Cafe,123 Main St,,1234567890,0,0.0,Cafe,,pune,,,2026-06-26T16:04:39,testmerchant_1632@example.com
+=======
+682,chatwala,varanasi,,9336058326,0,0.0,food,,varanasi,up,varansi,2026-06-26T10:49:58,vimalprakashgnesvns@gmail.com
+586,ai scanner,"online , varanasi",,9336058326,0,0.0,job search,,varanasi,up,varanasi,2026-06-26T12:38:19,vimalprakashgnesvns@gmail.com
+598,ai resume,up varanasi pandeypur,,9336058326,0,0.0,job,,varanasi,uttar pradesh,varanasi,2026-06-26T12:48:53,vimalprakashgnesvns@gmail.com
+>>>>>>> upstream/main

@@ -5,17 +5,20 @@ import Sidebar from './sidebar/Sidebar';
 import { useTheme } from '../hooks/useTheme';
 import ChatArea from './chat/ChatArea';
 
-export default function Layout({
-  isLoggedIn, setIsLoggedIn,
-  session, setSession,
-  currentSessionId, setCurrentSessionId,
-  chatList, setChatList,
-  chatListLoading, setChatListLoading,
-  onNewChat,
-  onLoadSession,
-  onDeleteSession,
-  toast,
-}) {
+export default function Layout(props) {
+  const {
+    isLoggedIn, setIsLoggedIn,
+    session, setSession,
+    currentSessionId, setCurrentSessionId,
+    chatList, setChatList,
+    chatListLoading, setChatListLoading,
+    onNewChat,
+    onLoadSession,
+    onDeleteSession,
+    onRenameSession,
+    onPinSession,
+    toast,
+  } = props;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
@@ -34,7 +37,9 @@ export default function Layout({
 
   const handleLogout = () => {
     setIsLoggedIn(false);
-    setSession({ type: 'GUEST', phone: null, businessId: null });
+    setSession({ type: 'GUEST', phone: null, email: null, businessId: null });
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('session');
     if (setCurrentSessionId) setCurrentSessionId(null);
     if (setChatList) setChatList([]);
     toast?.success('Logged out successfully');
@@ -58,6 +63,8 @@ export default function Layout({
         onNewChat={onNewChat}
         onLoadSession={onLoadSession}
         onDeleteSession={onDeleteSession}
+        onRenameSession={onRenameSession}
+        onPinSession={onPinSession}
         onLoadChatList={() => {}}
         isDark={isDark}
         onToggleTheme={toggleTheme}
@@ -108,17 +115,7 @@ export default function Layout({
           {showFloatingChat && (
             <div className="floating-chat-widget">
               <ChatArea
-                isLoggedIn={isLoggedIn}
-                setIsLoggedIn={setIsLoggedIn}
-                session={session}
-                setSession={setSession}
-                currentSessionId={currentSessionId}
-                setCurrentSessionId={setCurrentSessionId}
-                chatList={chatList}
-                setChatList={setChatList}
-                chatListLoading={chatListLoading}
-                setChatListLoading={setChatListLoading}
-                toast={toast}
+                {...props}
                 isFloating={true}
                 onClose={() => setShowFloatingChat(false)}
               />

@@ -27,7 +27,7 @@ def _get_next_key():
     return key
 
 
-def call_llm(messages, model, max_retries=2):
+def call_llm(messages, model, max_retries=2, max_tokens=1000):
     last_error = None
 
     for attempt in range(max_retries):
@@ -45,7 +45,8 @@ def call_llm(messages, model, max_retries=2):
                     },
                     json={
                         "model": model,
-                        "messages": messages
+                        "messages": messages,
+                        "max_tokens": max_tokens
                     },
                     timeout=30
                 )
@@ -109,7 +110,7 @@ def get_smart_suggestions(text, lang="en", context="QUERY"):
     model = "google/gemini-2.5-flash-lite" 
     
     try:
-        msg = call_llm([{"role": "user", "content": prompt}], model)
+        msg = call_llm([{"role": "user", "content": prompt}], model, max_tokens=150)
         content = msg.get("content", "[]")
         
         # SELF-HEALING JSON PARSER

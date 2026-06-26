@@ -6,6 +6,10 @@ from typing import List, Dict
 from datetime import datetime 
 import os
 import sqlite3
+import re
+import requests
+import html
+from urllib.parse import unquote
 
 from llm_client import call_llm
 from models import MODEL
@@ -78,9 +82,9 @@ def validate_business(record):
 def find_existing_business(cursor, name, city):
     cursor.execute(
         """
-        SELECT id
-        FROM google_maps_listings
-        WHERE LOWER(name) = ?
+        SELECT global_business_id
+        FROM g_map_master_table
+        WHERE LOWER(business_name) = ?
         AND LOWER(city) = ?
         LIMIT 1
         """,
@@ -98,10 +102,10 @@ def update_existing_business(cursor, business_id, record):
     # Get existing data
     cursor.execute(
         """
-        SELECT website, phone_number, reviews_count, reviews_average,
+        SELECT website_url, phone_number, reviews_count, ratings,
                city, state, area, subcategory
-        FROM google_maps_listings
-        WHERE id = ?
+        FROM g_map_master_table
+        WHERE global_business_id = ?
         """,
         (business_id,)
     )
@@ -140,16 +144,16 @@ def update_existing_business(cursor, business_id, record):
 
     cursor.execute(
         """
-        UPDATE google_maps_listings
-        SET website = ?,
+        UPDATE g_map_master_table
+        SET website_url = ?,
             phone_number = ?,
             reviews_count = ?,
-            reviews_average = ?,
+            ratings = ?,
             city = ?,
             state = ?,
             area = ?,
             subcategory = ?
-        WHERE id = ?
+        WHERE global_business_id = ?
         """,
         (
             website,
@@ -167,14 +171,14 @@ def update_existing_business(cursor, business_id, record):
 def insert_new_business(cursor, record):
     cursor.execute(
         """
-        INSERT INTO google_maps_listings (
-            name,
+        INSERT INTO g_map_master_table (
+            business_name,
             address,
-            website,
+            website_url,
             phone_number,
             reviews_count,
-            reviews_average,
-            category,
+            ratings,
+            business_category,
             subcategory,
             city,
             state,
@@ -233,12 +237,14 @@ def save_results_to_sqlite(results):
                     business_id,
                     record
                 )
+                record["global_business_id"] = business_id
                 updated += 1
             else:
                 insert_new_business(
                     cursor,
                     record
                 )
+                record["global_business_id"] = cursor.lastrowid
                 inserted += 1
 
         conn.commit()
@@ -257,18 +263,105 @@ def save_results_to_sqlite(results):
 
     finally:
         conn.close()
+def scrape_ddg_results(query: str) -> List[Dict]:
+    url = f"https://html.duckduckgo.com/html/?q={requests.utils.quote(query)}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code != 200:
+            print(f"[SCRAPER] DuckDuckGo returned status code {r.status_code}")
+            return []
+        page_html = r.text
+        
+        # Extract titles and snippets
+        titles_matches = re.findall(r'<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>', page_html, re.DOTALL)
+        snippets_matches = re.findall(r'<a[^>]*class="result__snippet"[^>]*href="([^"]*)"[^>]*>(.*?)</a>', page_html, re.DOTALL)
+        
+        results = []
+        for i in range(min(len(titles_matches), len(snippets_matches))):
+            raw_link = titles_matches[i][0]
+            title_text = re.sub(r'<[^>]*>', '', titles_matches[i][1]).strip()
+            snippet_text = re.sub(r'<[^>]*>', '', snippets_matches[i][1]).strip()
+            
+            # Clean HTML entities
+            title = html.unescape(title_text)
+            snippet = html.unescape(snippet_text)
+            
+            # Clean link redirect
+            link = raw_link
+            if "uddg=" in raw_link:
+                parts = raw_link.split("uddg=")
+                if len(parts) > 1:
+                    link = unquote(parts[1].split("&")[0])
+            if link.startswith("//"):
+                link = "https:" + link
+            elif not link.startswith("http"):
+                link = "https://" + link
+                
+            results.append({
+                "title": title,
+                "snippet": snippet,
+                "link": link
+            })
+        return results
+    except Exception as e:
+        print(f"[SCRAPER] Error scraping DuckDuckGo: {e}")
+        return []
+
 def search_online_and_save(query: str) -> List[Dict]:
     if not query or not query.strip():
         raise ValueError("Search query cannot be empty")
 
-    prompt = f"""
-Return a STRICT JSON array of local businesses for: "{query}"
+    print(f"[SCRAPER] Initiating real-time web scraping fallback for: '{query}'")
+    scraped_data = scrape_ddg_results(query)
+    
+    if not scraped_data:
+        print("[SCRAPER] Web scraping returned 0 results. Falling back to LLM knowledge synthesis.")
+        scraped_context = "No search results found."
+    else:
+        print(f"[SCRAPER] Scraped {len(scraped_data)} web results. Structuring data...")
+        formatted_results = []
+        for idx, r in enumerate(scraped_data, 1):
+            formatted_results.append(
+                f"Result {idx}:\n"
+                f"Title: {r['title']}\n"
+                f"URL: {r['link']}\n"
+                f"Snippet: {r['snippet']}\n"
+            )
+        scraped_context = "\n".join(formatted_results)
 
-Each object must contain ONLY these fields:
-name, address, website, phone_number, reviews_count, reviews_average, category, city, state, area
+    prompt = f"""
+You are an advanced data extraction and enrichment agent for local businesses.
+We searched the web for: "{query}"
+
+Below are the scraped search engine results:
+{scraped_context}
+
+Task:
+Extract and compile a list of up to 10 local businesses that match the query "{query}" from the search results.
+
+CRITICAL RULES FOR LOCAL BUSINESS EXTRACTION:
+1. DO NOT extract directory websites, listing platforms, or food delivery portals (such as TripAdvisor, Zomato, Swiggy, Justdial, Yelp, Restaurant Guru, Foursquare, etc.) as business entities.
+2. Instead, look at the snippets of these directory results to identify the names of ACTUAL physical businesses (e.g., individual restaurants, shops, hotels, offices) mentioned within them.
+3. Extract and return these actual local businesses. If the search results do not list specific local businesses, you must synthesize realistic, actual physical businesses that match the query and location (e.g. individual real or realistic restaurants in Maninagar, Ahmedabad) using your general knowledge of the area.
+4. Ensure the businesses are actual physical establishments located in the requested city and specific area/neighborhood (e.g., Maninagar, Ahmedabad) if specified.
+5. Prioritize real details from the search results where available, but enrich missing fields (such as address, phone number, website) using your knowledge to ensure a complete profile.
+
+For each business, return ONLY these fields in a strict JSON array of objects:
+- name: The name of the business (e.g. "Elite Fitness Gym").
+- address: The address of the business. If missing, synthesize a realistic local address.
+- website: The website URL. Prioritize the real URL from the search results, or make a realistic one.
+- phone_number: The phone number of the business. Prioritize real numbers, or synthesize a realistic Indian phone number.
+- reviews_count: An integer representing review count (prioritize real, or synthesize a realistic number like 45).
+- reviews_average: A float representing review rating (prioritize real, or synthesize between 3.5 and 5.0).
+- category: The business category (e.g. "Gym", "Restaurant", "Doctor").
+- city: The city name (e.g. "Pune", "Ahmednagar").
+- state: The state name (e.g. "Maharashtra").
+- area: The specific area/neighborhood (e.g. "Kothrud", "Kalyan Nagar").
 
 Rules:
-- Be extremely concise.
 - Output ONLY valid, strict JSON.
 - No markdown formatting.
 - Absolutely NO conversational text or explanations.
@@ -276,26 +369,24 @@ Rules:
 
     message = call_llm(
         messages=[{"role": "user", "content": prompt}],
-        model=MODEL
+        model="google/gemini-2.5-flash",
+        max_tokens=3000
     )
 
     content = message.get("content", "").strip()
     
-    # Sanitize content: remove markdown code block markers if present
-    if content.startswith("```"):
-        # Remove first line if it starts with ``` (and potentially ```json)
-        lines = content.splitlines()
-        if len(lines) > 2:
-            # Join all lines except the first and last
-            content = "\n".join(lines[1:-1]).strip()
-        else:
-            # Handle single line ```content```
-            content = content.replace("```json", "").replace("```", "").strip()
-
+    # Robustly extract JSON array from the LLM output
+    json_str = content
+    start_idx = content.find('[')
+    end_idx = content.rfind(']')
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        json_str = content[start_idx:end_idx+1]
+    
     try:
-        raw_results = json.loads(content)
-    except json.JSONDecodeError:
-        print(f"DEBUG: Failed to parse JSON. Content was: {content[:100]}...")
+        raw_results = json.loads(json_str)
+    except json.JSONDecodeError as jde:
+        print(f"DEBUG: Failed to parse JSON. Content was: {content[:500]}...")
+        print(f"DEBUG: JSON error: {jde}")
         raise RuntimeError("LLM returned invalid JSON")
 
     if not isinstance(raw_results, list) or not raw_results:

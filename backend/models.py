@@ -1,2 +1,2 @@
 # models.py
-MODEL = "deepseek/deepseek-chat"
+MODEL = "google/gemini-2.5-flash"

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -6,10 +6,13 @@ import ChatPage from './pages/ChatPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import AboutPage from './pages/AboutPage';
 import CategoriesPage from './pages/CategoriesPage';
+import LoginPage from './pages/LoginPage';
 import Toast from './components/ui/Toast';
 import { useTheme } from './hooks/useTheme';
 import { useToast } from './hooks/useToast';
 import { api } from './services/api';
+import { UI_TRANSLATIONS } from './constants/Translations';
+import { useChatMemory } from './hooks/useChatMemory';
 
 // ─── Global state that needs to persist across routes ─────
 function AppShell() {
@@ -17,57 +20,34 @@ function AppShell() {
 
   const { toasts, toast, dismiss } = useToast();
 
-  // Auth state
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [session, setSession] = useState({ type: 'GUEST', phone: null, email: null, businessId: null });
+  // Auth state with local storage persistence
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('isLoggedIn') === 'true';
+  });
+  const [session, setSession] = useState(() => {
+    const saved = localStorage.getItem('session');
+    return saved ? JSON.parse(saved) : { type: 'GUEST', phone: null, email: null, businessId: null };
+  });
 
-  // Chat session state (shared between Sidebar and ChatPage)
-  const [currentSessionId, setCurrentSessionId] = useState(null);
-  const [chatList, setChatList] = useState([]);
-  const [chatListLoading, setChatListLoading] = useState(false);
-
-  const getUserId = () => session.phone || session.email || null;
-
-  // ── Chat session handlers ─────────────────────────────
-  const handleNewChat = useCallback(async () => {
-    const userId = getUserId();
-    if (userId) {
-      try {
-        const res = await api.createChatSession(userId);
-        if (res.success) setCurrentSessionId(res.session_id);
-        const list = await api.listChatSessions(userId);
-        setChatList(Array.isArray(list) ? list : []);
-      } catch (e) { console.error('New chat session error:', e); }
+  useEffect(() => {
+    localStorage.setItem('isLoggedIn', isLoggedIn);
+    if (!isLoggedIn) {
+      localStorage.removeItem('token');
     }
-    setCurrentSessionId(null);
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    localStorage.setItem('session', JSON.stringify(session));
   }, [session]);
 
-  const handleLoadSession = useCallback(async (sessionId) => {
-    setCurrentSessionId(sessionId);
-    // ChatArea handles loading the session messages via useChatMemory
-  }, []);
-
-  const handleDeleteSession = useCallback(async (e, sessionId) => {
-    if (e) e.stopPropagation();
-    const userId = getUserId();
-    if (!userId) return;
-    try {
-      await api.deleteChatSession(sessionId, userId);
-      setChatList(prev => prev.filter(s => s.session_id !== sessionId));
-      if (currentSessionId === sessionId) setCurrentSessionId(null);
-      toast.success('Chat deleted');
-    } catch {
-      toast.error('Failed to delete chat');
-    }
-  }, [session, currentSessionId]);
+  // Unified chat memory service hook (manages all session lists, messages list, language and wizard states globally)
+  const chatMemory = useChatMemory({ session, toast });
 
   // Common props for Layout and pages
   const sharedProps = {
     isLoggedIn, setIsLoggedIn,
     session, setSession,
-    currentSessionId, setCurrentSessionId,
-    chatList, setChatList,
-    chatListLoading, setChatListLoading,
+    ...chatMemory,
     toast,
   };
 
@@ -79,19 +59,22 @@ function AppShell() {
           element={
             <Layout
               {...sharedProps}
-              onNewChat={handleNewChat}
-              onLoadSession={handleLoadSession}
-              onDeleteSession={handleDeleteSession}
+              onNewChat={chatMemory.handleNewChat}
+              onLoadSession={chatMemory.handleLoadSession}
+              onDeleteSession={chatMemory.handleDeleteSession}
+              onRenameSession={chatMemory.handleRenameSession}
+              onPinSession={chatMemory.handlePinSession}
             />
           }
         >
-          <Route index element={<HomePage toast={toast} />} />
-          <Route path="chat" element={<ChatPage {...sharedProps} />} />
-          <Route path="categories" element={<CategoriesPage toast={toast} />} />
-          <Route path="analytics" element={<AnalyticsPage toast={toast} />} />
-          <Route path="about" element={<AboutPage toast={toast} />} />
-          {/* Redirect unknown paths to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route index element={isLoggedIn ? <HomePage toast={toast} /> : <Navigate to="/login" replace />} />
+          <Route path="chat" element={isLoggedIn ? <ChatPage {...sharedProps} /> : <Navigate to="/login" replace />} />
+          <Route path="categories" element={isLoggedIn ? <CategoriesPage toast={toast} session={session} /> : <Navigate to="/login" replace />} />
+          <Route path="analytics" element={isLoggedIn ? <AnalyticsPage toast={toast} /> : <Navigate to="/login" replace />} />
+          <Route path="about" element={isLoggedIn ? <AboutPage toast={toast} /> : <Navigate to="/login" replace />} />
+          <Route path="login" element={<LoginPage {...sharedProps} />} />
+          {/* Redirect unknown paths to home if logged in, else login */}
+          <Route path="*" element={<Navigate to={isLoggedIn ? "/" : "/login"} replace />} />
         </Route>
       </Routes>
 

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   MessageSquare, Home, Settings, Plus, ChevronLeft, ChevronRight,
-  Sun, Moon, LogOut, User, Search, X, BarChart2, Info, Grid
+  Sun, Moon, LogOut, User, Search, X, BarChart2, Info, Grid, PlusCircle,
+  Briefcase
 } from 'lucide-react';
 
 import ChatHistoryList from './ChatHistoryList';
@@ -23,6 +24,8 @@ export default function Sidebar({
   onNewChat,
   onLoadSession,
   onDeleteSession,
+  onRenameSession,
+  onPinSession,
   onLoadChatList,
   // Theme
   isDark,
@@ -176,14 +179,19 @@ export default function Sidebar({
         {/* ─── NAV LINKS ────────────────────────────── */}
         <div style={{ padding: '0 10px 8px', flexShrink: 0 }}>
           <NavItem to="/" icon={<Home size={16} />} label="Home" collapsed={collapsed} />
-          <NavItem to="/chat" icon={<MessageSquare size={16} />} label="Chat" collapsed={collapsed} />
+          <NavItem to="/chat" icon={<img src="/avatar.png" alt="Chat Assistant" style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-subtle)' }} />} label="Chat" collapsed={collapsed} />
+          {isLoggedIn && session?.type === 'BUSINESS' && session?.businessId ? (
+            <NavItem to="/chat?q=show my business" icon={<Briefcase size={16} />} label={session.businessName || "My Business"} collapsed={collapsed} />
+          ) : (
+            <NavItem to="/chat?action=add_new_business" icon={<PlusCircle size={16} />} label="Add Business" collapsed={collapsed} />
+          )}
           <NavItem to="/categories" icon={<Grid size={16} />} label="Categories" collapsed={collapsed} />
           <NavItem to="/analytics" icon={<BarChart2 size={16} />} label="Analytics" collapsed={collapsed} />
           <NavItem to="/about" icon={<Info size={16} />} label="About" collapsed={collapsed} />
         </div>
 
-        {/* ─── SEARCH (only when expanded) ────────── */}
-        {isLoggedIn && !collapsed && (
+        {/* ─── SEARCH (always when expanded) ────────── */}
+        {!collapsed && (
           <div style={{ padding: '0 10px 8px', flexShrink: 0 }}>
             <div style={{
               position: 'relative',
@@ -220,7 +228,7 @@ export default function Sidebar({
         )}
 
         {/* ─── CHAT HISTORY ─────────────────────────── */}
-        {isLoggedIn && (
+        {true && (
           <>
             {!collapsed && (
               <div style={{
@@ -244,8 +252,10 @@ export default function Sidebar({
                 sessions={filteredSessions}
                 currentSessionId={currentSessionId}
                 loading={chatListLoading}
-                onLoad={(id) => { onLoadSession(id); setMobileOpen(false); }}
+                onLoad={(id) => { onLoadSession(id); navigate('/chat'); setMobileOpen(false); }}
                 onDelete={onDeleteSession}
+                onRename={onRenameSession}
+                onPin={onPinSession}
                 collapsed={collapsed}
               />
             </div>
@@ -280,73 +290,125 @@ export default function Sidebar({
           </button>
 
           {/* User profile / Login */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: collapsed ? '8px' : '8px 10px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--bg-surface-2)',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            marginTop: 4,
-          }}>
+          {/* User profile / Login */}
+          {isLoggedIn ? (
             <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              background: isLoggedIn
-                ? 'linear-gradient(135deg, #4f46e5, #7c3aed)'
-                : 'var(--border-default)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '0.8125rem',
-              fontWeight: 700,
-              flexShrink: 0,
+              gap: 8,
+              padding: collapsed ? '8px' : '8px 10px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--bg-surface-2)',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              marginTop: 4,
             }}>
-              {isLoggedIn ? userInitial : <User size={16} />}
-            </div>
-            {!collapsed && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  color: 'var(--text-primary)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {isLoggedIn ? userDisplay : 'Guest User'}
-                </p>
-                <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>
-                  {isLoggedIn ? (session?.type === 'BUSINESS' ? 'Business Owner' : 'Registered') : 'Not logged in'}
-                </p>
+              <div style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '0.8125rem',
+                fontWeight: 700,
+                flexShrink: 0,
+              }}>
+                {userInitial}
               </div>
-            )}
-            {!collapsed && isLoggedIn && (
-              <button
-                onClick={onLogout}
-                title="Logout"
-                style={{
-                  padding: 4,
-                  borderRadius: 6,
-                  border: 'none',
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  color: 'var(--text-muted)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  flexShrink: 0,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; }}
-                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; }}
-                aria-label="Logout"
-              >
-                <LogOut size={14} />
-              </button>
-            )}
-          </div>
+              {!collapsed && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {userDisplay}
+                  </p>
+                  <p style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>
+                    {session?.type === 'BUSINESS' ? 'Business Owner' : 'Registered'}
+                  </p>
+                </div>
+              )}
+              {!collapsed && (
+                <button
+                  onClick={onLogout}
+                  title="Logout"
+                  style={{
+                    padding: 4,
+                    borderRadius: 6,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+                  aria-label="Logout"
+                >
+                  <LogOut size={14} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <Link to="/login" style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: collapsed ? '8px' : '8px 10px',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--bg-surface-2)',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              marginTop: 4,
+              textDecoration: 'none',
+              cursor: 'pointer',
+              border: '1px solid var(--border-subtle)',
+              transition: 'border-color 0.2s ease',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-primary)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
+            >
+              <div style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'var(--border-default)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-secondary)',
+                fontSize: '0.8125rem',
+                fontWeight: 700,
+                flexShrink: 0,
+              }}>
+                <User size={16} />
+              </div>
+              {!collapsed && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    color: 'var(--text-primary)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    Guest User
+                  </p>
+                  <p style={{ fontSize: '0.625rem', color: 'var(--color-primary)', fontWeight: 700 }}>
+                    Sign In / Register
+                  </p>
+                </div>
+              )}
+            </Link>
+          )}
         </div>
       </nav>
     </>
@@ -355,7 +417,8 @@ export default function Sidebar({
 
 function NavItem({ to, icon, label, collapsed }) {
   const location = useLocation();
-  const isActive = location.pathname === to || (to === '/chat' && location.pathname.startsWith('/chat'));
+  const cleanToPath = to.split('?')[0];
+  const isActive = location.pathname === cleanToPath || (cleanToPath === '/chat' && location.pathname.startsWith('/chat') && (to.includes('action') ? location.search.includes('action') : !location.search.includes('action')));
 
   return (
     <Link

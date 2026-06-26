@@ -13,26 +13,42 @@ import { api } from '../../services/api';
 import { useChatMemory } from '../../hooks/useChatMemory';
 import { useChatWizards, ADD_BIZ_STEPS, getAddProductSteps, getAddDealSteps } from '../../hooks/useChatWizards';
 
-const ChatArea = ({
-  // Sidebar integration
-  isLoggedIn, setIsLoggedIn,
-  session, setSession,
-  currentSessionId, setCurrentSessionId,
-  chatList, setChatList,
-  chatListLoading, setChatListLoading,
-  // Toast
-  toast,
-  // Initial query (from home page search)
-  initialQuery,
-  onClearInitialQuery,
-  initialAction,
-  onClearInitialAction,
-  // Floating widget support
-  isFloating = false,
-  onClose,
-}) => {
+const ChatArea = (props) => {
+  const {
+    // Sidebar integration
+    isLoggedIn, setIsLoggedIn,
+    session, setSession,
+    currentSessionId, setCurrentSessionId,
+    chatList, setChatList,
+    chatListLoading, setChatListLoading,
+    // Toast
+    toast,
+    // Initial query (from home page search)
+    initialQuery,
+    onClearInitialQuery,
+    initialAction,
+    onClearInitialAction,
+    // Floating widget support
+    isFloating = false,
+    onClose,
+
+    // Lifted memory states and handlers from props (originally from useChatMemory)
+    localMessages, setLocalMessages,
+    currentLanguage, setCurrentLanguage,
+    flowMode, setFlowMode,
+    wizardStep, setWizardStep,
+    wizardData, setWizardData,
+    pendingUpdateField, setPendingUpdateField,
+    getUserId,
+    startNewSession,
+    handleNewChat,
+    handleLoadSession,
+    handleDeleteSession,
+    handleRenameSession,
+    handlePinSession,
+  } = props;
+
   const [inputText, setInputText] = useState('');
-  const [currentLanguage, setCurrentLanguage] = useState('en');
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [resetConfirmCount, setResetConfirmCount] = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -41,12 +57,16 @@ const ChatArea = ({
   const [showLoginPopup, setShowLoginPopup] = useState(false);
   const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
   const [backendHealth, setBackendHealth] = useState('checking');
+  const [autocompleteOptions, setAutocompleteOptions] = useState([]);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [compareList, setCompareList] = useState([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [comparisonData, setComparisonData] = useState([]);
+  const [isComparingLoading, setIsComparingLoading] = useState(false);
+  const [thinkingStatus, setThinkingStatus] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef(null);
 
-  const [localMessages, setLocalMessages] = useState([
-    { id: 'init', role: 'bot', type: 'text', content: UI_TRANSLATIONS.en.welcome }
-  ]);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -61,28 +81,12 @@ const ChatArea = ({
   // ── HOOKS ─────────────────────────────────────────────
   const wizards = useChatWizards({
     session, currentLanguage, setLocalMessages, addThinking, removeThinking,
-    setSession, setQuickActionsView: () => {},
+    setSession, setIsLoggedIn, setQuickActionsView: () => {},
+    flowMode, setFlowMode,
+    wizardStep, setWizardStep,
+    wizardData, setWizardData,
+    pendingUpdateField, setPendingUpdateField,
   });
-
-  const memory = useChatMemory({
-    session, currentLanguage, setLocalMessages,
-    setFlowMode: wizards.setFlowMode,
-    setWizardStep: wizards.setWizardStep,
-    setWizardData: wizards.setWizardData,
-  });
-
-  const { flowMode, setFlowMode, wizardStep, setWizardStep, wizardData, setWizardData, pendingUpdateField, setPendingUpdateField } = wizards;
-  const {
-    currentSessionId: memSessionId, setCurrentSessionId: setMemSessionId,
-    chatList: memChatList, setChatList: setMemChatList,
-    chatListLoading: memLoading, setChatListLoading: setMemLoading,
-    getUserId, startNewSession, loadChatList, loadPastSession, deleteSession, handleNewChat
-  } = memory;
-
-  // Sync memory hook session state upward if parent provided setters
-  useEffect(() => { if (setCurrentSessionId) setCurrentSessionId(memSessionId); }, [memSessionId]);
-  useEffect(() => { if (setChatList) setChatList(memChatList); }, [memChatList]);
-  useEffect(() => { if (setChatListLoading) setChatListLoading(memLoading); }, [memLoading]);
 
   // ── SCROLL TO BOTTOM ─────────────────────────────────
   useEffect(() => {
@@ -105,12 +109,50 @@ const ChatArea = ({
     }
   }, [currentLanguage]);
 
+  // Autocomplete debounce effect
+  useEffect(() => {
+    if (!inputText.trim()) {
+      setAutocompleteOptions([]);
+      return;
+    }
+    const delayDebounce = setTimeout(async () => {
+      try {
+        const res = await api.getAiSuggestions(inputText, currentLanguage, "QUERY");
+        if (res && res.suggestions) {
+          setAutocompleteOptions(res.suggestions);
+        }
+      } catch (err) {
+        console.error("Autocomplete error:", err);
+      }
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [inputText, currentLanguage]);
+
+  const handleCompareSubmit = async () => {
+    if (compareList.length < 2) {
+      toast?.warning("Select at least 2 businesses to compare");
+      return;
+    }
+    setIsCompareOpen(true);
+    setIsComparingLoading(true);
+    try {
+      const ids = compareList.map(b => b.global_business_id);
+      const data = await api.compareBusinesses(ids);
+      setComparisonData(data);
+    } catch (err) {
+      toast?.error("Failed to fetch comparison data");
+      setIsCompareOpen(false);
+    } finally {
+      setIsComparingLoading(false);
+    }
+  };
+
   // ── AUTO SESSION ON LOGIN ─────────────────────────────
   useEffect(() => {
-    if (isLoggedIn && !memSessionId && getUserId()) {
-      startNewSession().then(() => loadChatList());
+    if (isLoggedIn && !currentSessionId && getUserId()) {
+      startNewSession();
     }
-  }, [isLoggedIn, session, memSessionId]);
+  }, [isLoggedIn, session, currentSessionId, startNewSession, getUserId]);
 
   // ── HEALTH CHECK ──────────────────────────────────────
   const checkHealth = useCallback(async () => {
@@ -124,9 +166,51 @@ const ChatArea = ({
     return () => clearInterval(i);
   }, [checkHealth]);
 
+  // ── AUTO-SAVE GUEST MESSAGES & TITLE ─────────────────
+  useEffect(() => {
+    if (currentSessionId && currentSessionId.toString().startsWith('guest_')) {
+      // 1. Save messages to localStorage
+      try {
+        localStorage.setItem('guest_chat_messages_' + currentSessionId, JSON.stringify(localMessages));
+      } catch (e) {
+        console.error('Error saving guest messages to localStorage:', e);
+      }
+
+      // 2. Auto-update session title from first user message if title is still 'New Chat'
+      const userMsgs = localMessages.filter(m => m.role === 'user');
+      if (userMsgs.length > 0) {
+        try {
+          const savedChats = localStorage.getItem('guest_chat_list');
+          const chats = savedChats ? JSON.parse(savedChats) : [];
+          const currentChat = chats.find(c => c.session_id === currentSessionId);
+          
+          if (currentChat && currentChat.title === 'New Chat') {
+            const firstMsg = userMsgs[0].content || '';
+            const newTitle = firstMsg.trim().substring(0, 30) || 'New Chat';
+            const updatedChats = chats.map(c => 
+              c.session_id === currentSessionId ? { ...c, title: newTitle, updated_at: new Date().toISOString() } : c
+            );
+            localStorage.setItem('guest_chat_list', JSON.stringify(updatedChats));
+            
+            // Sync the sidebar chatList state
+            if (setChatList) {
+              setChatList(updatedChats);
+            }
+          }
+        } catch (e) {
+          console.error('Error updating guest session title:', e);
+        }
+      }
+    }
+  }, [localMessages, currentSessionId, setChatList]);
+
   // ── INITIAL QUERY ─────────────────────────────────────
   useEffect(() => {
     if (initialQuery) {
+      setFlowMode('QUERY');
+      setWizardStep(0);
+      setWizardData({});
+      setPendingUpdateField(null);
       handleSend(null, initialQuery);
       onClearInitialQuery?.();
     }
@@ -207,8 +291,10 @@ const ChatArea = ({
     const trans = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS.en;
     setIsLoggedIn(false);
     setSession({ type: 'GUEST', phone: null, businessId: null });
-    setMemSessionId(null);
-    setMemChatList([]);
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('session');
+    setCurrentSessionId(null);
+    setChatList([]);
     setFlowMode('QUERY');
     setWizardStep(0);
     setWizardData({});
@@ -217,6 +303,78 @@ const ChatArea = ({
       { id: 'hint', role: 'bot', type: 'text', content: trans.menu_hint || "💡 Click the ⋮ menu at the top for more options." }
     ]);
     toast?.success('Logged out successfully');
+  };
+
+  // ── EXPORT CHAT CONVERSATION ────────────────────────────
+  const handleExportChat = () => {
+    try {
+      let textContent = `==================================================\n`;
+      textContent += `          CITYHANGAROUNDS CHAT CONVERSATION LOG   \n`;
+      textContent += `==================================================\n`;
+      textContent += `Export Date: ${new Date().toLocaleString()}\n`;
+      textContent += `Session ID: ${currentSessionId || 'N/A'}\n`;
+      textContent += `Language: ${currentLanguage || 'en'}\n`;
+      textContent += `User: ${session?.phone || session?.email || 'Guest'}\n`;
+      textContent += `==================================================\n\n`;
+
+      localMessages.forEach((msg, idx) => {
+        if (msg.type === 'thinking') return;
+        const roleName = msg.role === 'user' ? 'USER' : 'AI ASSISTANT';
+        
+        // Simple human-readable representation of time
+        textContent += `[${roleName}]:\n`;
+        
+        if (msg.type === 'text' || msg.type === 'faq') {
+          textContent += `${msg.content}\n`;
+        } else if (msg.type === 'database') {
+          textContent += `${msg.intro || 'Results found:'}\n`;
+          const items = Array.isArray(msg.content) ? msg.content : Array.isArray(msg.data) ? msg.data : [];
+          items.forEach((biz, bidx) => {
+            textContent += `  ${bidx + 1}. ${biz.business_name} | ${biz.business_category || 'Business'} | Rating: ${biz.ratings || '0.0'} (${biz.reviews_count || 0} reviews)\n`;
+            textContent += `     Address: ${biz.address || 'N/A'} | Phone: ${biz.phone_number || 'N/A'}\n`;
+            if (biz.website_url) textContent += `     Website: ${biz.website_url}\n`;
+          });
+        } else if (msg.type === 'suggestions') {
+          textContent += `${msg.intro || 'Suggested profile updates:'}\n`;
+          (msg.content || []).forEach((s, sidx) => {
+            textContent += `  - ${s.title}: ${s.reason}\n`;
+          });
+        } else if (msg.type === 'manage_products') {
+          textContent += `${msg.intro || 'Products list:'}\n`;
+          (msg.content || []).forEach((p, pidx) => {
+            textContent += `  - ${p.name} (Price: ₹${p.price}) | ${p.description || ''}\n`;
+          });
+        } else if (msg.type === 'manage_deals') {
+          textContent += `${msg.intro || 'Deals list:'}\n`;
+          (msg.content || []).forEach((d, didx) => {
+            textContent += `  - ${d.title} (${d.discount_pct}% OFF) | Expires: ${d.expiry_date || 'N/A'}\n`;
+          });
+        } else {
+          textContent += `${String(msg.content || '')}\n`;
+        }
+        textContent += `\n--------------------------------------------------\n\n`;
+      });
+
+      textContent += `==================================================\n`;
+      textContent += `             END OF CONVERSATION LOG              \n`;
+      textContent += `==================================================\n`;
+
+      // Trigger download
+      const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `HBD_Chat_Session_${currentSessionId || 'export'}_${new Date().toISOString().slice(0,10)}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast?.success('Conversation exported successfully!');
+    } catch (e) {
+      console.error('Export failed:', e);
+      toast?.error('Failed to export conversation.');
+    }
   };
 
   // ── LOGIN SUCCESS ─────────────────────────────────────
@@ -228,7 +386,12 @@ const ChatArea = ({
       const trans = UI_TRANSLATIONS[currentLanguage || 'en'] || UI_TRANSLATIONS.en;
       if (res.status === 'logged_in' && res.businesses?.length) {
         const biz = res.businesses[0];
-        const sessionData = { type: 'BUSINESS', businessId: biz.global_business_id };
+        const sessionData = { 
+          type: 'BUSINESS', 
+          businessId: biz.global_business_id, 
+          businessName: biz.business_name,
+          city: biz.city 
+        };
         if (method === 'phone') sessionData.phone = identifier;
         else { sessionData.email = identifier; if (biz.phone_number) sessionData.phone = biz.phone_number; }
         setSession(sessionData);
@@ -238,12 +401,6 @@ const ChatArea = ({
           content: `👋 ${trans.welcome_back || 'Welcome back'}, ${biz.business_name}!`
         }]);
         toast?.success(`Welcome back, ${biz.business_name}!`);
-        try {
-          const sRes = await api.createChatSession(identifier);
-          if (sRes.success) setMemSessionId(sRes.session_id);
-          const list = await api.listChatSessions(identifier);
-          setMemChatList(Array.isArray(list) ? list : []);
-        } catch (err) { console.error('Chat session init error:', err); }
       } else {
         const sessionData = { type: 'REGISTERED' };
         if (method === 'phone') sessionData.phone = identifier;
@@ -255,12 +412,6 @@ const ChatArea = ({
           { id: Date.now() + 1, role: 'bot', type: 'text', content: trans.menu_hint || "💡 Click the ⋮ menu for more actions." }
         ]);
         toast?.info('Logged in. No business found — you can add one!');
-        try {
-          const sRes = await api.createChatSession(identifier);
-          if (sRes.success) setMemSessionId(sRes.session_id);
-          const list = await api.listChatSessions(identifier);
-          setMemChatList(Array.isArray(list) ? list : []);
-        } catch {}
       }
     } catch (e) {
       toast?.error(`Login error: ${e.message}`);
@@ -277,22 +428,58 @@ const ChatArea = ({
     setLocalMessages(prev => [...prev, { id: Date.now(), role: 'user', type: 'text', content: text }]);
     setMsgHistory(prev => prev[prev.length - 1] === text ? prev : [...prev, text]);
     setHistoryIndex(-1);
+    
+    // Set status and add thinking
+    setThinkingStatus('Analyzing query...');
     addThinking();
+
+    let statusInterval = null;
+    let elapsed = 0;
+    statusInterval = setInterval(() => {
+      elapsed += 0.5;
+      if (elapsed >= 5.0) {
+        setThinkingStatus('Finalizing response...');
+      } else if (elapsed >= 2.5) {
+        const isSearch = /restaurant|gym|hotel|shop|store|doctor|dentist|salon|spa|listing|business|in|near|find|search|where|online|scrape/i.test(text);
+        if (isSearch) {
+          setThinkingStatus('Scraping online web listings...');
+        } else {
+          setThinkingStatus('Synthesizing answer...');
+        }
+      } else if (elapsed >= 1.0) {
+        setThinkingStatus('Searching database...');
+      }
+    }, 500);
 
     try {
       const lang = currentLanguage || 'en';
       const trans = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS.en;
       const wasWizardFlow = await wizards.handleWizardSend(text, trans);
-      if (wasWizardFlow) return;
+      if (wasWizardFlow) {
+        clearInterval(statusInterval);
+        setThinkingStatus('');
+        return;
+      }
 
-      let activeSessionId = memSessionId;
-      if (isLoggedIn && !activeSessionId) {
+      let activeSessionId = currentSessionId;
+      if (!activeSessionId) {
         activeSessionId = await startNewSession();
-        await loadChatList();
       }
 
       const data = await api.query({ query: text, session, language: lang, session_id: activeSessionId });
+      clearInterval(statusInterval);
+      setThinkingStatus('');
       removeThinking();
+
+      // Re-fetch chat list to update sidebar titles in real-time
+      if (setChatList && activeSessionId) {
+        const uId = getUserId();
+        if (uId) {
+          api.listChatSessions(uId)
+            .then(list => setChatList(Array.isArray(list) ? list : []))
+            .catch(err => console.error("Error updating sidebar list:", err));
+        }
+      }
 
       const responseType = data.type || 'text';
       if (responseType === 'command') { handleAction(data.command); return; }
@@ -303,6 +490,8 @@ const ChatArea = ({
         intro: data.intro, suggestions: data.suggestions, prompt: data.prompt,
       }]);
     } catch (e) {
+      clearInterval(statusInterval);
+      setThinkingStatus('');
       removeThinking();
       const lang = currentLanguage || 'en';
       const trans = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS.en;
@@ -337,6 +526,14 @@ const ChatArea = ({
 
   // ── ACTION HANDLER ────────────────────────────────────
   const handleAction = async (action, payload) => {
+    // Reset wizard states if starting a new top-level action
+    if (['search', 'update', 'add_new_business', 'search_method', 'search_by_name', 'search_by_address', 'start_add_product', 'start_add_deal', 'reset_chat', 'login_trigger'].includes(action)) {
+      setFlowMode('QUERY');
+      setWizardStep(0);
+      setWizardData({});
+      setPendingUpdateField(null);
+    }
+
     const lang = currentLanguage || 'en';
     const trans = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS.en;
 
@@ -354,6 +551,53 @@ const ChatArea = ({
 
     if (actionLabels[action]) {
       setLocalMessages(prev => [...prev, { id: Date.now(), role: 'user', type: 'text', content: actionLabels[action] }]);
+    }
+
+    if (action === 'next_option' || action === 'prev_option' || action === 'filter_area' || action === 'filter_rating' || action === 'search_another') {
+      handleSend(null, payload);
+      return;
+    }
+
+    if (action === 'toggle_compare') {
+      const biz = payload;
+      setCompareList(prev => {
+        const exists = prev.some(c => Number(c.global_business_id) === Number(biz.global_business_id));
+        if (exists) {
+          toast?.info(`${biz.business_name} removed from comparison`);
+          return prev.filter(c => Number(c.global_business_id) !== Number(biz.global_business_id));
+        } else {
+          if (prev.length >= 3) {
+            toast?.warning("You can compare up to 3 businesses at a time");
+            return prev;
+          }
+          toast?.success(`${biz.business_name} added to comparison`);
+          return [...prev, biz];
+        }
+      });
+      return;
+    }
+
+    if (action === 'delete_business') {
+      if (window.confirm("Are you sure you want to permanently delete this business listing? This will also delete all products and deals associated with it.")) {
+        setThinkingStatus('Deleting business listing...');
+        addThinking();
+        try {
+          const res = await api.deleteBusiness(payload);
+          setThinkingStatus('');
+          removeThinking();
+          if (res.success) {
+            toast?.success("Business deleted successfully!");
+            handleLogout();
+          } else {
+            toast?.error(res.message || "Failed to delete business.");
+          }
+        } catch (e) {
+          setThinkingStatus('');
+          removeThinking();
+          toast?.error(e.message || "Failed to delete business.");
+        }
+      }
+      return;
     }
 
     if (action === 'go_back') return handleBack();
@@ -395,25 +639,24 @@ const ChatArea = ({
     }
     if (action === 'reset_chat') { setShowResetConfirm(true); return; }
     if (action === 'confirm_reset') {
-      if (memSessionId && getUserId()) {
-        api.deleteChatSession(memSessionId, getUserId()).then(() => loadChatList());
+      if (currentSessionId && getUserId()) {
+        await handleDeleteSession(null, currentSessionId);
       }
       setShowResetConfirm(false);
-      const hint = trans.menu_hint || "💡 Click the ⋮ menu for more options.";
-      setLocalMessages([
-        { id: 'init', role: 'bot', type: 'text', content: trans.chat_cleared || 'Chat cleared!' },
-        { id: 'hint', role: 'bot', type: 'text', content: hint }
-      ]);
-      setResetConfirmCount(0); setFlowMode('QUERY'); setWizardStep(0); setWizardData({}); setMemSessionId(null);
-      toast?.success('Chat cleared');
+      setResetConfirmCount(0);
+      setFlowMode('QUERY');
+      setWizardStep(0);
+      setWizardData({});
       return;
     }
     if (action !== 'reset_chat') setResetConfirmCount(0);
 
     if (action === 'search') {
+      setThinkingStatus('Fetching business profile...');
       addThinking();
       try {
-        const data = await api.query({ query: 'show my business', session, language: lang, session_id: memSessionId });
+        const data = await api.query({ query: 'show my business', session, language: lang, session_id: currentSessionId });
+        setThinkingStatus('');
         removeThinking();
         if (!data || (!data.type && data.detail)) {
           setLocalMessages(prev => [...prev, { id: Date.now(), role: 'bot', type: 'text', content: '❌ Could not load your business.' }]);
@@ -424,12 +667,14 @@ const ChatArea = ({
           content: data.content ?? data.data ?? data.detail ?? 'No data found.',
           intro: data.intro, prompt: data.prompt, suggestions: data.suggestions
         }]);
-      } catch { removeThinking(); toast?.error('Error loading business'); }
+      } catch { setThinkingStatus(''); removeThinking(); toast?.error('Error loading business'); }
     }
     if (action === 'update') {
+      setThinkingStatus('Preparing business update wizard...');
       addThinking();
       try {
-        const data = await api.query({ query: 'update my business', session, language: lang, session_id: memSessionId });
+        const data = await api.query({ query: 'update my business', session, language: lang, session_id: currentSessionId });
+        setThinkingStatus('');
         removeThinking();
         setLocalMessages(prev => [...prev, { id: Date.now(), role: 'suggestions', content: data.content, intro: data.intro }]);
       } catch { removeThinking(); }
@@ -459,7 +704,7 @@ const ChatArea = ({
     if (action === 'manage_products') {
       addThinking();
       try {
-        const data = await api.query({ query: 'manage product', session, language: lang, session_id: memSessionId });
+        const data = await api.query({ query: 'manage product', session, language: lang, session_id: currentSessionId });
         removeThinking();
         setLocalMessages(prev => [...prev, {
           id: Date.now(), role: 'bot',
@@ -472,7 +717,7 @@ const ChatArea = ({
     if (action === 'manage_deals') {
       addThinking();
       try {
-        const data = await api.query({ query: 'manage deal', session, language: lang, session_id: memSessionId });
+        const data = await api.query({ query: 'manage deal', session, language: lang, session_id: currentSessionId });
         removeThinking();
         setLocalMessages(prev => [...prev, {
           id: Date.now(), role: 'bot',
@@ -634,6 +879,7 @@ const ChatArea = ({
                       </>
                     )}
                     <MenuBtn icon={<Plus size={14} style={{ color: '#10b981' }} />} label={UI_TRANSLATIONS[currentLanguage || 'en']?.btn_add || 'Add Business'} onClick={() => { setIsActionsMenuOpen(false); handleAction('add_new_business'); }} />
+                    <MenuBtn icon={<svg viewBox="0 0 24 24" width="14" height="14" stroke="#059669" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>} label="Export Chat" onClick={() => { setIsActionsMenuOpen(false); handleExportChat(); }} />
                     <div style={{ margin: '4px 12px', borderTop: '1px solid var(--border-subtle)' }} />
                     <MenuBtn icon={<RefreshCw size={14} style={{ color: 'var(--color-error)' }} />} label={UI_TRANSLATIONS[currentLanguage || 'en']?.btn_reset || 'Reset Chat'} onClick={() => { setIsActionsMenuOpen(false); handleAction('reset_chat'); }} color="error" />
                     {isLoggedIn && (
@@ -707,51 +953,61 @@ const ChatArea = ({
                 onAction={handleAction}
                 isLoggedIn={isLoggedIn}
                 session={session}
+                language={currentLanguage}
+                compareList={compareList}
               />
             ))}
-            {isThinking && <TypingIndicator />}
+            {isThinking && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <TypingIndicator status={thinkingStatus} />
+                
+                {/* Shimmering Skeleton Loader for Business Cards */}
+                {(thinkingStatus.includes('Scraping') || thinkingStatus.includes('Searching')) && (
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', 
+                    gap: 14, 
+                    width: '100%',
+                    marginTop: 4,
+                    animation: 'scaleIn 200ms ease'
+                  }}>
+                    {[...Array(3)].map((_, idx) => (
+                      <div key={idx} style={{
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-lg)',
+                        height: 180,
+                        padding: 14,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 10,
+                        overflow: 'hidden',
+                        position: 'relative'
+                      }}>
+                        {/* Title shimmer */}
+                        <div style={{ height: 16, width: '70%', background: 'var(--bg-surface-2)', borderRadius: 4 }} className="shimmer" />
+                        {/* Subtitle shimmer */}
+                        <div style={{ height: 12, width: '40%', background: 'var(--bg-surface-2)', borderRadius: 4 }} className="shimmer" />
+                        {/* Address shimmer */}
+                        <div style={{ height: 10, width: '90%', background: 'var(--bg-surface-2)', borderRadius: 4, marginTop: 'auto' }} className="shimmer" />
+                        {/* Actions row shimmer */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+                          {[...Array(4)].map((_, i) => (
+                            <div key={i} style={{ height: 20, borderRadius: 6, background: 'var(--bg-surface-2)' }} className="shimmer" />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── QUICK ACTION CHIPS (logged in business) ── */}
-      {isLoggedIn && session.businessId && flowMode === 'QUERY' && (
-        <div style={{
-          padding: '8px 12px',
-          background: 'var(--bg-surface)',
-          borderTop: '1px solid var(--border-subtle)',
-          display: 'flex',
-          gap: 6,
-          overflowX: 'auto',
-          flexShrink: 0,
-        }}
-          className="no-scrollbar"
-        >
-          {[
-            { label: 'Add Product', action: 'start_add_product', emoji: '📦' },
-            { label: 'Add Deal', action: 'start_add_deal', emoji: '🏷️' },
-            { label: 'My Products', action: 'manage_products', emoji: '📋' },
-            { label: 'My Deals', action: 'manage_deals', emoji: '🔥' },
-          ].map(chip => (
-            <button
-              key={chip.action}
-              onClick={() => handleAction(chip.action)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px',
-                background: 'var(--bg-surface-2)', border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-full)', cursor: 'pointer', fontSize: '0.75rem',
-                fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap',
-                transition: 'all var(--transition-fast)',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.color = 'var(--color-primary)'; e.currentTarget.style.background = 'var(--color-primary-light)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-surface-2)'; }}
-            >
-              {chip.emoji} {chip.label}
-            </button>
-          ))}
-        </div>
-      )}
+
 
       {/* ── INPUT BAR ─────────────────────────────── */}
       {flowMode === 'ADD_PRODUCT' && wizardStep === 4 ? (
@@ -872,6 +1128,189 @@ const ChatArea = ({
         />
       )}
 
+
+      {/* Sticky Comparison Bar at Bottom */}
+      {compareList.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          bottom: 76,
+          left: 16,
+          right: 16,
+          background: 'rgba(79, 70, 229, 0.95)',
+          backdropFilter: 'blur(8px)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '10px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          color: 'white',
+          boxShadow: '0 4px 20px rgba(79, 70, 229, 0.35)',
+          zIndex: 80,
+          animation: 'slideUp 200ms ease'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>📊</span>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 700 }}>
+              Compare Businesses ({compareList.length} selected)
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button 
+              onClick={() => setCompareList([])}
+              style={{
+                background: 'transparent', border: '1px solid rgba(255,255,255,0.4)',
+                color: 'white', padding: '4px 10px', borderRadius: 6, fontSize: '0.75rem',
+                fontWeight: 600, cursor: 'pointer'
+              }}
+            >
+              Clear
+            </button>
+            <button 
+              onClick={handleCompareSubmit}
+              disabled={compareList.length < 2}
+              style={{
+                background: 'white', border: 'none', color: 'var(--color-primary)',
+                padding: '4px 12px', borderRadius: 6, fontSize: '0.75rem',
+                fontWeight: 700, cursor: compareList.length < 2 ? 'not-allowed' : 'pointer',
+                opacity: compareList.length < 2 ? 0.6 : 1
+              }}
+            >
+              Compare Now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Comparison Drawer / Modal */}
+      {isCompareOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          padding: 16, animation: 'fadeIn 200ms ease'
+        }}>
+          <div style={{
+            background: 'var(--bg-surface)',
+            width: '100%',
+            maxWidth: 800,
+            maxHeight: '90vh',
+            borderRadius: 'var(--radius-xl)',
+            boxShadow: 'var(--shadow-xl)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            animation: 'scaleIn 250ms ease'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                📊 Side-by-Side Business Comparison
+              </h3>
+              <button 
+                onClick={() => setIsCompareOpen(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body / Table */}
+            <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
+              {isComparingLoading ? (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                  <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px' }} />
+                  <p style={{ fontSize: '0.875rem' }}>Loading comparison details...</p>
+                </div>
+              ) : comparisonData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                  No comparison data available.
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border-subtle)' }}>
+                      <th style={{ padding: '10px 8px', fontWeight: 700, width: '25%' }}>Features</th>
+                      {comparisonData.map((biz, idx) => (
+                        <th key={idx} style={{ padding: '10px 8px', fontWeight: 800, color: 'var(--color-primary)' }}>
+                          {biz.business_name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-secondary)' }}>Category</td>
+                      {comparisonData.map((biz, idx) => (
+                        <td key={idx} style={{ padding: '10px 8px' }}>
+                          <span className="badge badge-primary" style={{ fontSize: '0.625rem' }}>
+                            {biz.business_category}
+                          </span>
+                        </td>
+                      ))}
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-secondary)' }}>Rating</td>
+                      {comparisonData.map((biz, idx) => (
+                        <td key={idx} style={{ padding: '10px 8px', fontWeight: 700, color: '#f59e0b' }}>
+                          ★ {Number(biz.ratings).toFixed(1)} ({biz.reviews_count} reviews)
+                        </td>
+                      ))}
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-secondary)' }}>Address</td>
+                      {comparisonData.map((biz, idx) => (
+                        <td key={idx} style={{ padding: '10px 8px', color: 'var(--text-secondary)', lineHeight: 1.3 }}>
+                          {biz.area ? `${biz.area}, ` : ''}{biz.address}, {biz.city}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-secondary)' }}>Phone</td>
+                      {comparisonData.map((biz, idx) => (
+                        <td key={idx} style={{ padding: '10px 8px' }}>
+                          {biz.phone_number ? <a href={`tel:${biz.phone_number}`} style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>{biz.phone_number}</a> : "N/A"}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-secondary)' }}>Website</td>
+                      {comparisonData.map((biz, idx) => (
+                        <td key={idx} style={{ padding: '10px 8px' }}>
+                          {biz.website_url ? <a href={biz.website_url.startsWith('http') ? biz.website_url : `https://${biz.website_url}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>Visit site</a> : "N/A"}
+                        </td>
+                      ))}
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px 8px', fontWeight: 600, color: 'var(--text-secondary)' }}>Active Deals</td>
+                      {comparisonData.map((biz, idx) => (
+                        <td key={idx} style={{ padding: '10px 8px' }}>
+                          {biz.deals && biz.deals.length > 0 ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                              {biz.deals.map((d, didx) => (
+                                <div key={didx} style={{ background: '#fce7f3', color: '#be185d', padding: '2px 6px', borderRadius: 4, fontSize: '0.6875rem', fontWeight: 700 }}>
+                                  🏷️ {d.discount_pct}% OFF: {d.title}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>No active deals</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {/* ── RESET CONFIRMATION ────────────────────── */}
       {showResetConfirm && (
         <>
