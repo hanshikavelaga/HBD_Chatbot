@@ -17,49 +17,52 @@ from models import MODEL
 EXCEL_FILE = "missing_data_from_db.xlsx"
 
 REQUIRED_FIELDS = {
-    "name": "",
+    "business_name": "",
     "address": "",
-    "website": "",
+    "website_url": "",
     "phone_number": "",
     "reviews_count": 0,
-    "reviews_average": 0.0,
-    "category": "",
-    # "subcategory": "",
+    "ratings": 0.0,
+    "business_category": "",
     "city": "",
     "state": "",
     "area": ""
 }
 
-
 def _normalize_results(raw: List[Dict]) -> List[Dict]:
     normalized = []
 
     for item in raw:
-        record = {}
+        record = {
+            "business_name": item.get("name", ""),
+            "address": item.get("address", ""),
+            "website_url": item.get("website", ""),
+            "phone_number": item.get("phone_number", ""),
+            "reviews_count": item.get("reviews_count", 0),
+            "ratings": item.get("reviews_average", 0.0),
+            "business_category": item.get("category", ""),
+            "city": item.get("city", ""),
+            "state": item.get("state", ""),
+            "area": item.get("area", ""),
+            "subcategory": item.get("subcategory", "")
+        }
 
-        for field, default in REQUIRED_FIELDS.items():
-            value = item.get(field, default)
+        try:
+            record["reviews_count"] = int(record["reviews_count"])
+        except:
+            record["reviews_count"] = 0
 
-            if field == "reviews_count":
-                try:
-                    value = int(value)
-                except:
-                    value = 0
-
-            if field == "reviews_average":
-                try:
-                    value = float(value)
-                except:
-                    value = 0.0
-
-            record[field] = value
+        try:
+            record["ratings"] = float(record["ratings"])
+        except:
+            record["ratings"] = 0.0
 
         normalized.append(record)
 
     return normalized
 
 def validate_business(record):
-    if not record.get("name", "").strip():
+    if not record.get("business_name", "").strip():
         return False
 
     if not record.get("address", "").strip():
@@ -68,10 +71,10 @@ def validate_business(record):
     if not record.get("city", "").strip():
         return False
 
-    if not record.get("category", "").strip():
+    if not record.get("business_category", "").strip():
         return False
 
-    if record.get("reviews_average", 0) < 0 or record.get("reviews_average", 0) > 5:
+    if record.get("ratings", 0) < 0 or record.get("ratings", 0) > 5:
         return False
 
     if record.get("reviews_count", 0) < 0:
@@ -79,31 +82,36 @@ def validate_business(record):
 
     return True
 
-def find_existing_business(cursor, name, city):
+def find_existing_business(cursor, business_name, city):
     cursor.execute(
         """
+        SELECT global_business_id
+        FROM g_map_master_table
+        WHERE LOWER(business_name) = ?
         SELECT global_business_id
         FROM g_map_master_table
         WHERE LOWER(business_name) = ?
         AND LOWER(city) = ?
         LIMIT 1
         """,
-        (name.strip().lower(), city.strip().lower())
+        (business_name.strip().lower(), city.strip().lower())
     )
 
     row = cursor.fetchone()
 
     if row:
-        return row[0]  # business id
+        return row[0]
 
     return None
-
 def update_existing_business(cursor, business_id, record):
     # Get existing data
     cursor.execute(
         """
         SELECT website_url, phone_number, reviews_count, ratings,
+        SELECT website_url, phone_number, reviews_count, ratings,
                city, state, area, subcategory
+        FROM g_map_master_table
+        WHERE global_business_id = ?
         FROM g_map_master_table
         WHERE global_business_id = ?
         """,
@@ -116,10 +124,10 @@ def update_existing_business(cursor, business_id, record):
         return
 
     (
-        db_website,
+        db_website_url,
         db_phone,
         db_reviews_count,
-        db_reviews_average,
+        db_ratings,
         db_city,
         db_state,
         db_area,
@@ -127,7 +135,7 @@ def update_existing_business(cursor, business_id, record):
     ) = existing
 
     # Fill missing values only
-    website = db_website or record.get("website", "")
+    website_url = db_website_url or record.get("website_url", "")
     phone_number = db_phone or record.get("phone_number", "")
     city = db_city or record.get("city", "")
     state = db_state or record.get("state", "")
@@ -136,30 +144,34 @@ def update_existing_business(cursor, business_id, record):
 
     # Update reviews only if newer count is higher
     reviews_count = db_reviews_count
-    reviews_average = db_reviews_average
+    ratings = db_ratings
 
     if record.get("reviews_count", 0) > (db_reviews_count or 0):
         reviews_count = record.get("reviews_count", 0)
-        reviews_average = record.get("reviews_average", 0)
+        ratings = record.get("ratings", 0)
 
     cursor.execute(
         """
         UPDATE g_map_master_table
         SET website_url = ?,
+        UPDATE g_map_master_table
+        SET website_url = ?,
             phone_number = ?,
             reviews_count = ?,
+            ratings = ?,
             ratings = ?,
             city = ?,
             state = ?,
             area = ?,
             subcategory = ?
         WHERE global_business_id = ?
+        WHERE global_business_id = ?
         """,
         (
-            website,
+            website_url,
             phone_number,
             reviews_count,
-            reviews_average,
+            ratings,
             city,
             state,
             area,
@@ -170,42 +182,41 @@ def update_existing_business(cursor, business_id, record):
 
 def insert_new_business(cursor, record):
     cursor.execute(
-        """
-        INSERT INTO g_map_master_table (
-            business_name,
-            address,
-            website_url,
-            phone_number,
-            reviews_count,
-            ratings,
-            business_category,
-            subcategory,
-            city,
-            state,
-            area,
-            created_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            record.get("name", ""),
-            record.get("address", ""),
-            record.get("website", ""),
-            record.get("phone_number", ""),
-            record.get("reviews_count", 0),
-            record.get("reviews_average", 0.0),
-            record.get("category", ""),
-            record.get("subcategory", ""),
-            record.get("city", ""),
-            record.get("state", ""),
-            record.get("area", ""),
-            datetime.now().isoformat()
-        )
+    """
+    INSERT INTO g_map_master_table (
+        business_name,
+        address,
+        website_url,
+        phone_number,
+        reviews_count,
+        ratings,
+        business_category,
+        subcategory,
+        city,
+        state,
+        area,
+        created_at
     )
-
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """,
+    (
+        record.get("business_name", ""),
+        record.get("address", ""),
+        record.get("website_url", ""),
+        record.get("phone_number", ""),
+        record.get("reviews_count", 0),
+        record.get("ratings", 0.0),
+        record.get("business_category", ""),
+        record.get("subcategory", ""),
+        record.get("city", ""),
+        record.get("state", ""),
+        record.get("area", ""),
+        datetime.now().isoformat()
+    )
+)
 DB = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
-    "g_map_master_table.db"
+    "google_map_data.db"
 )
 
 def save_results_to_sqlite(results):
@@ -227,7 +238,7 @@ def save_results_to_sqlite(results):
             # Duplicate check
             business_id = find_existing_business(
                 cursor,
-                record.get("name", ""),
+                record.get("business_name", ""),
                 record.get("city", "")
             )
 
@@ -333,35 +344,17 @@ def search_online_and_save(query: str) -> List[Dict]:
         scraped_context = "\n".join(formatted_results)
 
     prompt = f"""
-You are an advanced data extraction and enrichment agent for local businesses.
-We searched the web for: "{query}"
+Return a STRICT JSON array of local businesses for: "{query}"
 
-Below are the scraped search engine results:
-{scraped_context}
-
-Task:
-Extract and compile a list of up to 10 local businesses that match the query "{query}" from the search results.
-
-CRITICAL RULES FOR LOCAL BUSINESS EXTRACTION:
-1. DO NOT extract directory websites, listing platforms, or food delivery portals (such as TripAdvisor, Zomato, Swiggy, Justdial, Yelp, Restaurant Guru, Foursquare, etc.) as business entities.
-2. Instead, look at the snippets of these directory results to identify the names of ACTUAL physical businesses (e.g., individual restaurants, shops, hotels, offices) mentioned within them.
-3. Extract and return these actual local businesses. If the search results do not list specific local businesses, you must synthesize realistic, actual physical businesses that match the query and location (e.g. individual real or realistic restaurants in Maninagar, Ahmedabad) using your general knowledge of the area.
-4. Ensure the businesses are actual physical establishments located in the requested city and specific area/neighborhood (e.g., Maninagar, Ahmedabad) if specified.
-5. Prioritize real details from the search results where available, but enrich missing fields (such as address, phone number, website) using your knowledge to ensure a complete profile.
-
-For each business, return ONLY these fields in a strict JSON array of objects:
-- name: The name of the business (e.g. "Elite Fitness Gym").
-- address: The address of the business. If missing, synthesize a realistic local address.
-- website: The website URL. Prioritize the real URL from the search results, or make a realistic one.
-- phone_number: The phone number of the business. Prioritize real numbers, or synthesize a realistic Indian phone number.
-- reviews_count: An integer representing review count (prioritize real, or synthesize a realistic number like 45).
-- reviews_average: A float representing review rating (prioritize real, or synthesize between 3.5 and 5.0).
-- category: The business category (e.g. "Gym", "Restaurant", "Doctor").
-- city: The city name (e.g. "Pune", "Ahmednagar").
-- state: The state name (e.g. "Maharashtra").
-- area: The specific area/neighborhood (e.g. "Kothrud", "Kalyan Nagar").
+Each object must contain ONLY these fields:
+name, address, website, phone_number, reviews_count, reviews_average, category,subcategory, city, state, area
 
 Rules:
+- Always provide a subcategory whenever possible.
+- Example:
+  - category = Restaurant
+  - subcategory = South Indian
+- Be extremely concise.
 - Output ONLY valid, strict JSON.
 - No markdown formatting.
 - Absolutely NO conversational text or explanations.
@@ -426,6 +419,6 @@ if __name__ == "__main__":
         print(f"✅ {len(results)} result(s):\n")
         for i, r in enumerate(results, 1):
             print(
-                f"{i}. {r['name']} | {r['category']} | "
+                f"{i}. {r['business_name']} | {r['business_category']} | "
                 f"{r['city']}, {r['state']}"
             )

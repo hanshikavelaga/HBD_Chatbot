@@ -14,16 +14,26 @@ def generate_sql(query: str) -> str:
                 "g_map_master_table\n\n"
 
                 "COLUMNS:\n"
-                "global_business_id, csv_id, business_name, address, website_url, phone_number,\n"
+                "global_business_id, csv_id,business_name, address, website_url, phone_number,\n"
                 "reviews_count, ratings,\n"
-                "business_category, subcategory, city, state, area, created_at, email\n\n"
+                "business_category, subcategory, city, state, area,created_at,email\n\n"
+
+                "IMPORTANT:\n"
+                "- Use business_name instead of name.\n"
+                "- Use website_url instead of website.\n"
+                "- Use business_category instead of category.\n"
+                "- Use global_business_id instead of id.\n"
+                "- Always use the exact column names listed above.\n"
+                "- Never generate SQL using the old column names (id, name, website, or category).\n\n"
+
+                
 
                 "MANDATORY RULES:\n"
                 "1. ALWAYS use SELECT DISTINCT * FROM g_map_master_table\n"
                 "2. ALWAYS use AND between city and business intent filters\n"
                 "3. Match business intent using PARTIAL ROOT WORDS\n"
                 "   (example: ayurvedic -> ayurved, restaurant -> restaur)\n"
-                "4. Match intent across business_name OR business_category OR subcategory\n"
+                "4. Match intent across business_nname OR business_category OR subcategory\n"
                 "5. Use LOWER(column) LIKE '%root%'\n"
                 "6. EXCLUDE businesses with ratings < 3.0\n"
                 "7. Ranking formula:\n"
