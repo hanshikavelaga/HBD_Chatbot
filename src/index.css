@@ -527,17 +527,31 @@ body {
   padding: 8px 10px;
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: all var(--transition-fast);
   position: relative;
   color: var(--text-secondary);
 }
-.chat-history-item:hover { background: var(--bg-surface-2); color: var(--text-primary); }
-.chat-history-item.active { background: var(--color-primary-light); color: var(--color-primary); }
-.chat-history-item .delete-btn {
+.chat-history-item:hover {
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+}
+.chat-history-item.active {
+  background: var(--bg-surface-2);
+  border-left: 3px solid var(--color-primary);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  color: var(--text-primary);
+}
+.chat-history-item .action-buttons-container {
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--transition-fast);
 }
-.chat-history-item:hover .delete-btn { opacity: 1; }
+.chat-history-item:hover .action-buttons-container,
+.chat-history-item.active .action-buttons-container {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 /* ============================================================
    BUSINESS CARD (in chat)
@@ -764,4 +778,107 @@ body {
     border-radius: 0;
     z-index: 10000;
   }
+}
+
+/* ─── PREMIUM ADDITIONS & GLASSMORPHISM SYSTEM ─── */
+
+/* Audio speaking wave animation */
+@keyframes wave {
+  0% { transform: scaleY(0.3); }
+  100% { transform: scaleY(1.1); }
+}
+
+.audio-wave span {
+  display: inline-block;
+  transform-origin: bottom;
+}
+
+/* Premium Business Card CTA Button hover effects */
+.biz-card-cta-btn {
+  transition: all 150ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.biz-card-cta-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120%;
+  height: 120%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translate(-50%, -50%) scale(0);
+  border-radius: 50%;
+  transition: transform 300ms ease;
+}
+
+.biz-card-cta-btn:active::after {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 0;
+  transition: transform 0s, opacity 300ms;
+}
+
+/* Glassmorphism Styling System */
+.glass-container {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.dark .glass-container {
+  background: rgba(17, 12, 28, 0.7);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Neon Glow Accents */
+.glow-neon-primary {
+  box-shadow: 0 0 15px rgba(79, 70, 229, 0.25), 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.glow-neon-accent {
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.25), 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
+/* Micro-animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 250ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Custom scrollbar for premium sidebar look */
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

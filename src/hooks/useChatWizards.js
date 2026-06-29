@@ -35,12 +35,17 @@ export function useChatWizards({
   addThinking,
   removeThinking,
   setSession,
-  setQuickActionsView
+  setIsLoggedIn,
+  setQuickActionsView,
+  flowMode,
+  setFlowMode,
+  wizardStep,
+  setWizardStep,
+  wizardData,
+  setWizardData,
+  pendingUpdateField,
+  setPendingUpdateField
 }) {
-  const [flowMode, setFlowMode] = useState('QUERY'); // QUERY | UPDATE_VALUE | SEARCH_NAME | SEARCH_ADDR | ADD_WIZARD | ADD_PRODUCT | ADD_DEAL
-  const [wizardStep, setWizardStep] = useState(0);
-  const [wizardData, setWizardData] = useState({});
-  const [pendingUpdateField, setPendingUpdateField] = useState(null);
 
   const formatFieldName = (field) =>
     field
@@ -78,13 +83,7 @@ export function useChatWizards({
     formData.append('file', file);
 
     try {
-      const res = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      }).then(r => {
-        if (!r.ok) throw new Error("Upload failed");
-        return r.json();
-      });
+      const res = await api.uploadImage(formData);
 
       removeThinking();
       if (res.success) {
@@ -110,6 +109,16 @@ export function useChatWizards({
 
   const handleWizardSend = async (text, trans) => {
     const lang = currentLanguage || 'en';
+    const cleanText = text.trim().toLowerCase();
+    if (cleanText === 'cancel' || cleanText === 'exit' || cleanText === 'quit' || cleanText === 'reset') {
+      setFlowMode('QUERY');
+      setWizardStep(0);
+      setWizardData({});
+      setPendingUpdateField(null);
+      removeThinking();
+      setLocalMessages(prev => [...prev, { id: Date.now(), role: 'bot', type: 'text', content: trans.wizard_canceled || "Wizard canceled. You can now search for businesses again." }]);
+      return true;
+    }
 
     if (flowMode === 'UPDATE_VALUE') {
       if (pendingUpdateField === 'phone_number') {
@@ -251,7 +260,15 @@ export function useChatWizards({
           removeThinking();
           setFlowMode('QUERY');
           if (res.success) {
-            setSession({ type: 'BUSINESS', phone: finalData.phone, businessId: res.id });
+            setSession({
+              type: 'BUSINESS',
+              phone: finalData.phone || session.phone,
+              email: finalData.email || session.email,
+              businessId: res.id,
+              businessName: finalData.name,
+              city: finalData.city
+            });
+            setIsLoggedIn?.(true);
             setQuickActionsView('main');
             setLocalMessages(prev => [...prev, { id: Date.now(), role: 'bot', type: 'text', content: trans.business_added }]);
           } else {

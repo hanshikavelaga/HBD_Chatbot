@@ -38,7 +38,7 @@ def unify_ids():
         cur.execute("DROP TABLE IF EXISTS google_maps_listings")
         cur.execute("""
         CREATE TABLE google_maps_listings (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             address TEXT,
             website TEXT,

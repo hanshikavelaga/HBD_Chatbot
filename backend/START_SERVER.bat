@@ -19,9 +19,31 @@ echo.
 echo ====================================================================
 echo.
 
+:: Check and Create Virtual Environment
+if not exist ".\.venv\Scripts\python.exe" (
+    echo Virtual environment (.venv) not found. Creating it...
+    where python >nul 2>nul
+    if errorlevel 1 (
+        echo.
+        echo ERROR: Python was not found on your system path.
+        echo Please install Python 3.10+ and make sure it is added to your PATH.
+        echo.
+        pause
+        exit /b 1
+    )
+    python -m venv .venv
+    if errorlevel 1 (
+        echo ERROR: Failed to create virtual environment.
+        pause
+        exit /b 1
+    )
+    echo Virtual environment created successfully!
+)
+
 :: Check and Install Missing Libraries
-echo Checking for required libraries...
-".\.venv\Scripts\python.exe" -m pip install -r requirements.txt --quiet
+echo Checking and installing required libraries...
+".\.venv\Scripts\python.exe" -m pip install --upgrade pip
+".\.venv\Scripts\python.exe" -m pip install -r requirements.txt
 
 :: Set DB path relative to script directory
 set DATABASE_URL=%~dp0google_map_data.db

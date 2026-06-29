@@ -20,7 +20,7 @@ def migrate():
     # Create Table Schema (matches CSV header)
     cur.execute("""
     CREATE TABLE google_maps_listings (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         address TEXT,
         website TEXT,

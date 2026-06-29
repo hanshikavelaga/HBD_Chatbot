@@ -27,6 +27,9 @@ def generate_sql(query: str) -> str:
                 "- Never generate SQL using the old column names (id, name, website, or category).\n\n"
 
                 
+                "global_business_id, csv_id, business_name, address, website_url, phone_number,\n"
+                "reviews_count, ratings,\n"
+                "business_category, subcategory, city, state, area, created_at, email\n\n"
 
                 "MANDATORY RULES:\n"
                 "1. ALWAYS use SELECT DISTINCT * FROM g_map_master_table\n"
