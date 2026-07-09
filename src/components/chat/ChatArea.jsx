@@ -6,7 +6,6 @@ import {
 import MessageItem from '../MessageItem';
 import LoginPopup from '../LoginPopup';
 import TypingIndicator from './TypingIndicator';
-import WelcomeScreen from './WelcomeScreen';
 import { INDIAN_LANGUAGES } from '../../constants/Languages';
 import { UI_TRANSLATIONS } from '../../constants/Translations';
 import { api } from '../../services/api';
@@ -98,16 +97,29 @@ const ChatArea = (props) => {
     }
   }, [localMessages]);
 
-  // ── LANGUAGE CHANGE ───────────────────────────────────
+  // ── LANGUAGE CHANGE & INITIAL MESSAGE ───────────────────────────────────
   useEffect(() => {
     const lang = currentLanguage || 'en';
     const trans = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS.en;
-    const hint = trans.menu_hint || "💡 Tip: Use the ⋮ menu at the top for more options.";
 
     if (localMessages.length <= 2 && localMessages.every(m => m.id === 'init' || m.id === 'hint')) {
       setLocalMessages([
-        { id: 'init', role: 'bot', type: 'text', content: trans.welcome || trans.welcome_message },
-        { id: 'hint', role: 'bot', type: 'text', content: hint },
+        { 
+          id: 'init', 
+          role: 'bot', 
+          type: 'faq', 
+          content: "👋 Welcome to HoneyBee Digital!\n\nI'm your AI Customer Support Assistant.\n\nI can help you explore businesses, products and other information available in our database.\n\nHow can I help you today?",
+          suggestions: [
+            { title: "🏢 Explore Listings", action: "query_rewrite", query: "Explore Listings" },
+            { title: "📦 Browse Products", action: "query_rewrite", query: "Browse Products" },
+            { title: "📂 Browse Categories", action: "query_rewrite", query: "Browse Categories" },
+            { title: "📍 Browse Locations", action: "query_rewrite", query: "Browse Locations" },
+            { title: "⭐ Top Rated Businesses", action: "query_rewrite", query: "Top Rated Businesses" },
+            { title: "🔥 Trending Products", action: "query_rewrite", query: "Trending Products" },
+            { title: "🆕 Recently Added", action: "query_rewrite", query: "Recently Added" },
+            { title: "❓ Help", action: "query_rewrite", query: "Help" }
+          ]
+        }
       ]);
     }
   }, [currentLanguage]);
@@ -840,7 +852,6 @@ const ChatArea = (props) => {
 
   // Only messages that are visible (filter out thinking — shown by TypingIndicator)
   const visibleMessages = localMessages.filter(m => m.type !== 'thinking');
-  const isEmptyChat = visibleMessages.length <= 2 && visibleMessages.every(m => m.id === 'init' || m.id === 'hint');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-base)', position: 'relative' }}>
@@ -1035,11 +1046,8 @@ const ChatArea = (props) => {
         style={{ flex: 1, overflowY: 'auto', padding: '16px' }}
         className="no-scrollbar"
       >
-        {isEmptyChat ? (
-          <WelcomeScreen onSend={(q) => handleSend(null, q)} />
-        ) : (
-          <>
-            {visibleMessages.map(msg => (
+        <>
+          {visibleMessages.map(msg => (
               <MessageItem
                 key={msg.id}
                 message={msg}
@@ -1095,8 +1103,7 @@ const ChatArea = (props) => {
                 )}
               </div>
             )}
-          </>
-        )}
+        </>
         <div ref={messagesEndRef} />
       </div>
 

@@ -15,6 +15,8 @@ CORE BEHAVIOR
 - Communicate purely in natural language.
 - Prefer fast, deterministic answers when data is available.
 - Follow safety, authorization, and data-integrity rules strictly.
+- STRICT READ-ONLY MODE: You are a strictly read-only interface to the company MySQL database. You cannot insert, update, or delete any data.
+- NO HALLUCINATION: You must ONLY use the provided contextual data to answer questions. NEVER invent businesses, products, ratings, or facts.
 - IMPORTANT: ALWAYS respond in the user's preferred language if specified.
 - TRANSLATION RULE: If the user's preferred language is not English, you MUST translate ALL information, including business descriptions and category names, into that language. Do not leave English text in your response.
 """
@@ -77,6 +79,7 @@ For example, if history shows user searched for "restaurants in Delhi" and the n
 SUPPORTED INTENTS:
 - Greeting: User says hi, hello, namaste, good morning, etc.
 - Business Search: Searching for general businesses (e.g., "find shops in Pune")
+- Product Search: Searching for specific products (e.g., "laptops", "shoes under 500")
 - Category Search: Searching specifically by category (e.g., "restaurants", "hotels", "gyms")
 - Location Search: Refining search by city, area, landmark (e.g., "in Maninagar")
 - Recommendation: Asking for advice (e.g., "which is the best school?")
@@ -102,6 +105,7 @@ SUPPORTED INTENTS:
 ENTITIES & FILTERS TO EXTRACT:
 - "category": e.g., "Restaurant", "Hotel", "Gym", "Hospital", "Salon", "School", "Cafe", etc.
 - "business_name": Name of specific business if mentioned.
+- "product": Name of specific product if mentioned.
 - "location": An object with "city", "state", "area", "landmark", "pincode"
 - "limit": Integer representing requested count limit (e.g., 5, 10, 20) or null
 - "ranking": "best", "top", "highest_rated", "most_reviewed", "newest", "trending" or null
@@ -291,7 +295,7 @@ def generate_conversational_summary_and_chips(query: str, results: list, languag
     
     prompt = f"""
 You are the intelligent HoneyBee Digital AI Business Assistant.
-The user is searching for local businesses.
+The user is searching for local businesses, products, categories, or locations.
 
 User Query: "{query}"
 
@@ -303,14 +307,15 @@ Structured Search Results (Source of Truth):
 
 Your Task:
 1. Generate a warm, professional, conversational response summarizing the search results in the requested language code '{language}'.
-   - Highlight the best recommendations based on ratings, reviews count, location, and completeness from the results.
-   - CRITICAL: Never hallucinate or modify business names, phone numbers, website URLs, addresses, or ratings. All business facts must match the structured results exactly.
+   - Highlight the best recommendations based on ratings, reviews count, location, price, and completeness from the results.
+   - CRITICAL: Never hallucinate or modify business/product names, prices, phone numbers, website URLs, addresses, or ratings. All facts must match the structured results exactly.
    - If the results list is empty, explain that no direct matches were found, and encourage searching for nearby locations or other categories, or searching online.
-2. Suggest exactly 5-8 clickable follow-up suggestion chips (1-3 words each) that are highly relevant to what the user searched for.
-   - For Restaurants: "Top Rated ⭐", "Budget Friendly 💸", "Family Restaurants 👨‍👩‍👧‍👦", "Pure Veg 🥗", "Open Now ⏰", "Show More ⏭️"
-   - For Hotels: "Luxury Stays 🏨", "Budget Stays 💵", "Near Airport ✈️", "With Pool 🏊", "Compare Stays ⚖️"
-   - For Gyms: "CrossFit 🏋️", "Yoga Centers 🧘", "24x7 Gyms ⏰", "Affordable 💰", "Personal Trainer 🤝"
-   - Ensure the chips are highly contextual to the current category and user intent.
+2. Suggest exactly 5-8 clickable follow-up suggestion chips (1-4 words each) that are highly relevant. 
+   - ALWAYS include general discovery chips like: "Explore Listings", "Trending Products", "Top Cities", "Top Rated Businesses".
+   - Also include contextual chips:
+   - For Restaurants: "Top Rated ⭐", "Family Restaurants 👨‍👩‍👧‍👦", "Pure Veg 🥗", "Open Now ⏰"
+   - For Hotels: "Luxury Stays 🏨", "Budget Stays 💵", "Near Airport ✈️", "With Pool 🏊"
+   - For Products: "Trending Products 📦", "Under Budget 💸", "Similar Products 🔄"
 
 Return ONLY a strict JSON object with:
 - "summary": "Conversational reply text here"
@@ -334,7 +339,7 @@ Do NOT use markdown code blocks or explanations. Output ONLY strict JSON.
         }
     except Exception as e:
         print(f"Error in LLM summarization: {e}")
-        default_suggs = ["Top Rated ⭐", "Budget Friendly 💸", "Open Now ⏰", "Compare Listings ⚖️", "Search Online 🌐"]
+        default_suggs = ["Explore Listings 🏢", "Trending Products 📦", "Top Cities 📍", "Top Rated ⭐", "Search Online 🌐"]
         if results:
             first_biz = results[0].get("business_name", "listings")
             return {
@@ -362,7 +367,8 @@ Recent Conversation History:
 
 Your Task:
 1. Generate a natural, helpful, conversational response to the user's message in their preferred language code '{language}'.
-2. Suggest 5-8 clickable suggestion chips (1-3 words each) that make it extremely easy for the user to explore the HoneyBee Digital directory (e.g. category searches like restaurants, gyms, hotels, or adding a business).
+2. Suggest 5-8 clickable suggestion chips (1-4 words each) that make it extremely easy for the user to explore the HoneyBee Digital directory.
+   - You MUST include these exact chips often: "Explore Listings", "Trending Products", "Browse Categories", "Top Cities", "Top Rated Businesses".
 
 Return ONLY a strict JSON object with:
 - "response": "Conversational reply text here"
@@ -387,6 +393,6 @@ Do NOT use markdown code blocks or explanations. Output ONLY strict JSON.
     except Exception as e:
         print(f"Error in AI conversational response: {e}")
         return {
-            "response": "Hello! How can I help you today? You can search for local businesses, look up reviews, or manage your listing.",
-            "suggestions": ["Search Restaurants 🍕", "Find Hotels 🏨", "Add Business 🏢", "Help ❓"]
+            "response": "Hello! How can I help you today? You can search for local businesses, look up products, or explore top cities.",
+            "suggestions": ["Explore Listings 🏢", "Trending Products 📦", "Top Cities 📍", "Top Rated ⭐", "Browse Categories 📂"]
         }

@@ -10,3 +10,4 @@ uvicorn
 openpyxl
 python-multipart
 bcrypt
+mysql-connector-python
