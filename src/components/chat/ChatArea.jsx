@@ -469,7 +469,17 @@ const ChatArea = (props) => {
     try {
       const lang = currentLanguage || 'en';
       const trans = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS.en;
+      console.log("BEFORE", {
+      flowMode,
+      wizardStep,
+      text
+      });
       const wasWizardFlow = await wizards.handleWizardSend(text, trans);
+      console.log("AFTER", {
+      flowMode,
+      wizardStep,
+      wasWizardFlow
+      });
       if (wasWizardFlow) {
         clearInterval(statusInterval);
         setThinkingStatus('');
@@ -644,6 +654,8 @@ const ChatArea = (props) => {
     if (action === 'search_by_name') { setFlowMode('SEARCH_NAME'); setLocalMessages(prev => [...prev, { id: Date.now(), role: 'bot', type: 'text', content: trans.search_prompt }]); }
     if (action === 'search_by_address') { setFlowMode('SEARCH_ADDR'); setLocalMessages(prev => [...prev, { id: Date.now(), role: 'bot', type: 'text', content: trans.address_prompt }]); }
     if (action === 'add_new_business') {
+      console.log("ADD BUSINESS FIRED");
+      console.trace();
       wizards.setWizardStep(ADD_BIZ_STEPS);
       setFlowMode('ADD_WIZARD'); setWizardStep(0);
       const initialData = {};
@@ -1152,9 +1164,9 @@ const ChatArea = (props) => {
           }}
         >
         <div style={{display: "flex", gap: "10px", padding: "10px 14px", overflowX: "auto", borderTop: "1px solid var(--border-subtle)", background: "var(--bg-primary)"}}>
-            <button onClick={() => handleAction('add_new_business')} style={{ background: "var(--bg-surface-2)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: "999px", padding: "10px 90px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontSize: "13px", transition: "0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.18)"; e.currentTarget.style.background = "var(--color-primary)"; e.currentTarget.style.color = "#fff";}} onMouseLeave={(e) => {e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.08)"; e.currentTarget.style.background = "var(--bg-surface-2)"; e.currentTarget.style.color = "var(--text-primary)";}} onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.97)";}} onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)";}}>➕ Add Business</button>
-            <button onClick={() => handleAction('search')} style={{ background: "var(--bg-surface-2)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: "999px", padding: "10px 90px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontSize: "13px", transition: "0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.18)"; e.currentTarget.style.background = "var(--color-primary)"; e.currentTarget.style.color = "#fff";}} onMouseLeave={(e) => {e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.08)"; e.currentTarget.style.background = "var(--bg-surface-2)"; e.currentTarget.style.color = "var(--text-primary)";}} onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.97)";}} onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)";}}>🏢 My Businesses</button>
-            <button onClick={() => handleAction('update')} style={{ background: "var(--bg-surface-2)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: "999px", padding: "10px 90px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontSize: "13px", transition: "0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.18)"; e.currentTarget.style.background = "var(--color-primary)"; e.currentTarget.style.color = "#fff";}} onMouseLeave={(e) => {e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.08)"; e.currentTarget.style.background = "var(--bg-surface-2)"; e.currentTarget.style.color = "var(--text-primary)";}} onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.97)";}} onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)";}}>✏️ Update Businesses</button>
+          <button type="button" onClick={() => handleAction('add_new_business')} style={{ background: "var(--bg-surface-2)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: "999px", padding: "10px 90px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontSize: "13px", transition: "0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.18)"; e.currentTarget.style.background = "var(--color-primary)"; e.currentTarget.style.color = "#fff";}} onMouseLeave={(e) => {e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.08)"; e.currentTarget.style.background = "var(--bg-surface-2)"; e.currentTarget.style.color = "var(--text-primary)";}} onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.97)";}} onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)";}}>➕ Add Business</button>
+          <button type="button" onClick={() => handleAction('search')} style={{ background: "var(--bg-surface-2)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: "999px", padding: "10px 90px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontSize: "13px", transition: "0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.18)"; e.currentTarget.style.background = "var(--color-primary)"; e.currentTarget.style.color = "#fff";}} onMouseLeave={(e) => {e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.08)"; e.currentTarget.style.background = "var(--bg-surface-2)"; e.currentTarget.style.color = "var(--text-primary)";}} onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.97)";}} onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)";}}>🏢 My Businesses</button>
+          <button type="button" onClick={() => handleAction('update')} style={{ background: "var(--bg-surface-2)", color: "var(--text-primary)", border: "1px solid var(--border-subtle)", borderRadius: "999px", padding: "10px 90px", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", fontSize: "13px", transition: "0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)"; e.currentTarget.style.boxShadow = "0 8px 20px rgba(0,0,0,0.18)"; e.currentTarget.style.background = "var(--color-primary)"; e.currentTarget.style.color = "#fff";}} onMouseLeave={(e) => {e.currentTarget.style.transform = "translateY(0) scale(1)"; e.currentTarget.style.boxShadow = "0 2px 6px rgba(0,0,0,0.08)"; e.currentTarget.style.background = "var(--bg-surface-2)"; e.currentTarget.style.color = "var(--text-primary)";}} onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.97)";}} onMouseUp={(e) => { e.currentTarget.style.transform = "translateY(-3px) scale(1.04)";}}>✏️ Update Businesses</button>
         </div>
           <div style={{
             display: 'flex',
