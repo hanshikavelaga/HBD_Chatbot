@@ -33,7 +33,7 @@ DDL_STATEMENTS = [
         INDEX idx_ccs_user_id (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """,
-
+    
     # ── Chat messages ─────────────────────────────────────────────────
     """
     CREATE TABLE IF NOT EXISTS chatbot_chat_messages (
